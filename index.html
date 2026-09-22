@@ -393,11 +393,10 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
    HEEEHABABY 買家前台（LINE LIFF）
    名詞與訂單狀態依系統規格：團 / 願望清單 / 拆單 / 狀態機
    ---------------------------------------------------------------------------
-   ★ 後端接點（前端不直連資料庫、不持有金鑰，身分由後端驗 LIFF idToken）
-     GET  /webhook/liff/trip/current      GET /webhook/liff/items
-     GET  /webhook/liff/cart              GET /webhook/liff/wishes
-     GET  /webhook/liff/orders            POST /webhook/liff/checkout
-     POST /webhook/liff/payment           GET /webhook/liff/tracking?no=
+   ★ 後端接點：見 japan-system 的 BUYER_API_CONTRACT.md（/api/v1/{resource}/{action}，26 個）
+     前端不直連資料庫、不持有金鑰；身分一律送 LIFF ID token，由後端驗證。
+     本前台獨立部署於 japan-front-end-system，/api/v1/* 由 vercel.json 反向代理到後端，
+     瀏覽器看到的是同網域，不需要 CORS。
    ★ 門市資料：正式版改接超商電子地圖 API（7-11 OpenPoint / 全家 FamiPort），
      本檔內建全台縣市鄉鎮清單與門市索引作為離線後備。
    =========================================================================== */
@@ -478,7 +477,7 @@ var FX = { cvs:70, home:120 };
    ========================================================================= */
 var CFG = {
   liffId : "2011699944-c5n725TF",
-  base   : "/api/v1",   // 與 japan-system 同網域（web/liff/），不需 CORS
+  base   : "/api/v1",   // 由 vercel.json rewrites 代理到後端 japan-system，瀏覽器視為同網域
   mock   : true,        // ← 後端端點就緒後改成 false
   timeout: 12000,       // 單次請求逾時（ms）
   retry  : 2            // 僅對網路錯誤與 5xx 重試
@@ -787,7 +786,6 @@ var TW = {
 "金門縣":"金城,金湖,金沙,金寧,烈嶼",
 "連江縣":"南竿,北竿,莒光,東引"};
 var CITIES = Object.keys(TW);
-var suffixCity = c => (c.endsWith("市")&&["基隆市","新竹市","嘉義市"].indexOf(c)<0)||c.endsWith("市")?"區":(c==="新竹縣"||c==="苗栗縣"?"":"");
 function districtName(city,d){
   const mun=["臺北市","新北市","桃園市","臺中市","臺南市","高雄市","基隆市","新竹市","嘉義市"];
   if(mun.indexOf(city)>=0) return d+"區";
@@ -888,12 +886,13 @@ const $  = s=>document.querySelector(s);
 const $$ = s=>[...document.querySelectorAll(s)];
 
 const nf = n=>(n==null||isNaN(n))?"—":Number(n).toLocaleString("zh-TW");
-const item=id=>null;
 const cCount=()=>S.cart.reduce((a,l)=>a+l.q,0);
 const cTotal=()=>S.cart.reduce((a,l)=>a+(l.p||0)*l.q,0);
 const line=(src,ref)=>S.cart.find(l=>l.src===src&&l.ref===ref);
 const liveOn=()=>LIVE.on&&(LIVE.endAt-new Date()>0);
 const fold=(k,o)=>o?S.open.add(k):S.open.delete(k);
+/* 放進行內事件字串參數的值要用 jsq：esc 的 &#39; 會被瀏覽器還原成 ' 而截斷字串 */
+const jsq=s=>String(s==null?"":s).replace(/\\/g,"\\\\").replace(/'/g,"\\x27").replace(/"/g,"\\x22").replace(/</g,"\\x3c").replace(/\r?\n/g," ");
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad=n=>String(n).padStart(2,"0");
 const now=()=>{const d=new Date();return `${d.getMonth()+1}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;};
@@ -927,7 +926,6 @@ function lbZoom(e){
   $("#lbz").textContent = _lbZoom>1 ? `${_lbZoom.toFixed(2)}×　點兩下繼續放大` : "點兩下放大";
 }
 function closeLb(e){ if(e&&e.target&&e.target.id==="lbimg")return; $("#lb").classList.remove("show"); }
-function lbItem(id,ev){ if(ev)ev.stopPropagation(); const p=item(id); lightbox("emoji",p.e,`${p.brand}　${p.name}`); }
 
 /* ---------- Sheet ---------- */
 function openSheet(title,body,foot){
@@ -1355,7 +1353,6 @@ function terms(){
   openSheet("代購須知",`<div class="sm" style="color:var(--ink-2);line-height:1.95">
     <b style="color:var(--ink)">缺貨處理</b><br>日本現場缺貨將於採購當日通知，該品項全額退款，不影響其他品項。<br><br>
     <b style="color:var(--ink)">拆單出貨</b><br>同團部分品項延後到貨時將拆單出貨，台灣端運費僅收一次。<br><br>
-    <b style="color:var(--ink)">合併出貨</b><br>同一團的多張「待採購」訂單可於訂單頁申請合併，運費併為一次。<br><br>
     <b style="color:var(--ink)">國際運費</b><br>依實際材積與重量，於商品回台秤重後個別通知補款。<br><br>
     <b style="color:var(--ink)">超商取貨</b><br>包裹到店後請於 7 日內取件，逾期將退回並酌收回運費。<br><br>
     <b style="color:var(--ink)">瑕疵處理</b><br>請於取貨後 3 日內提供完整開箱影片。日本境內版商品無台灣代理商保固。<br><br>
@@ -1433,7 +1430,7 @@ function vHome(){
     <div class="livebar" onclick="go('live')" style="cursor:pointer">
       <span class="ldot"></span>
       <span style="flex:1;text-align:left"><b>${esc(LIVE.title)}</b>
-        <br><span class="tiny" style="opacity:.88">${openBC.length} 項可喊・${esc(DB.broadcast[0].deadline)} 截止</span></span>
+        <br><span class="tiny" style="opacity:.88">${openBC.length} 項可喊・${esc(openBC[0].deadline)} 截止</span></span>
       <span class="ar">›</span></div>
     <div style="height:11px"></div>
     <div class="lcgrid">${openBC.slice(0,2).map(bcCard).join("")}</div>
@@ -1483,7 +1480,7 @@ function bcCard(it){
     <div class="row" style="align-items:flex-start">
       <div class="lno">${it.no.split("-").pop()}</div>
       <div class="zoomable" style="width:56px;height:56px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;font-size:26px;flex:none"
-        onclick="lightbox('emoji','${it.e}','${esc(it.n)}')">${it.e}</div>
+        onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')">${it.e}</div>
       <div style="flex:1;min-width:0">
         <b class="sm" style="font-weight:700;line-height:1.45;display:block">${esc(it.n)}</b>
         ${it.note?`<div class="tiny dim">${esc(it.note)}</div>`:""}
@@ -1668,7 +1665,7 @@ function vCart(){
 function cartLine(l){
   const c=SRC[l.src], cf=l.conf?CONF[l.conf]:null;
   return `<div class="item" style="background:var(--surface);border:1px solid var(--line-soft);border-radius:13px;margin-bottom:9px">
-    <div class="ph ${l.img?"zoomable":""}" ${l.img?`onclick="lightbox('img','${l.img}','${esc(l.n)}')"`:""}>
+    <div class="ph ${l.img?"zoomable":""}" ${l.img?`onclick="lightbox('img','${jsq(l.img)}','${jsq(l.n)}')"`:""}>
       ${l.img?`<img src="${l.img}">`:l.e}</div>
     <div class="info">
       <div class="row" style="gap:6px;margin-bottom:3px">
@@ -1704,7 +1701,7 @@ function vLive(){
       <div class="row" style="margin-top:12px">
         <div class="cbox" style="flex:1"><b>${openN}</b><span>可喊商品</span></div>
         <div class="cbox" style="flex:1"><b>${mine.reduce((a,l)=>a+l.q,0)}</b><span>我喊到</span></div>
-        <div class="cbox" style="flex:1.5"><b style="font-size:14px">${esc(DB.broadcast[0].deadline)}</b><span>收單截止</span></div></div>
+        <div class="cbox" style="flex:1.5"><b style="font-size:14px">${DB.broadcast[0]?esc(DB.broadcast[0].deadline):"—"}</b><span>收單截止</span></div></div>
     </div>
     <div class="alert pine" style="margin-top:12px"><b>也可以直接在群組喊</b><br>${esc(LIVE.hint)}　系統會自動放進你的購物車。</div>
     <div class="h2">現場推播 <span class="dim tiny" style="font-weight:400">由新到舊</span></div>
@@ -1735,7 +1732,7 @@ function vWish(){
     ${DB.wishes.length?DB.wishes.map(w=>{const s=WST[w.st];
       return `<div class="wish">
         <div class="row" style="align-items:flex-start">
-          ${w.img?`<img class="pv zoomable" src="${w.img}" alt="" onclick="lightbox('img','${"$"}{w.img}','${"$"}{esc(w.title)}')">`:""}
+          ${w.img?`<img class="pv zoomable" src="${w.img}" alt="" onclick="lightbox('img','${jsq(w.img)}','${jsq(w.title)}')">`:""}
           <div style="flex:1;min-width:0">
             <div class="oid">${w.id}・${w.src}提交・${w.at}</div>
             <b style="font-size:14px;font-weight:700;line-height:1.45;display:block;margin-top:2px">
@@ -1758,7 +1755,7 @@ function vWish(){
     <p class="tiny dim" style="text-align:center;margin:6px 0 8px">許願不代表保留名額，以小幫手現場實際採購為準</p></div>`;
 }
 function vOrders(){
-  const live=DB.orders.filter(o=>o.st<4), done=DB.orders.filter(o=>o.st>=4);
+  const live=DB.orders.filter(o=>!o.exception&&o.st<4), done=DB.orders.filter(o=>o.exception||o.st>=4);
   const rows=S.oFilter==="live"?live:S.oFilter==="done"?done:[];
   return `<div class="wrap">
     <div class="h2">我的訂單</div>
@@ -1779,24 +1776,27 @@ function vOrders(){
 function orderCard(o){
   const q=o.items.reduce((a,i)=>a+i.q,0);
   const arr=o.items.filter(i=>i.ist==="已到貨"), pen=o.items.filter(i=>i.ist!=="已到貨");
-  const tag=o.st===0?`<span class="pill grey">待確認</span>`
+  const tag=o.exception?`<span class="pill beni">${esc(o.exception)}</span>`
+          :o.st===0?`<span class="pill grey">待確認</span>`
           :o.st===1?`<span class="pill gold">已報價</span>`
           :o.st===4?`<span class="pill pine">已送達</span>`:`<span class="pill gold">${OS[o.st]}</span>`;
   return `<details class="order" ${S.open.has(o.id)?"open":""} ontoggle="fold('${o.id}',this.open)">
     <summary><div class="between">
       <div style="min-width:0"><div class="oid">${o.id}</div>
-        <div class="sm" style="font-weight:500">${o.items[0].e} ${esc(o.items[0].n)}${o.items.length>1?` 等 ${o.items.length} 項`:""}</div>
+        <div class="sm" style="font-weight:500">${o.items[0]?o.items[0].e+" "+esc(o.items[0].n):"（品項整理中）"}${o.items.length>1?` 等 ${o.items.length} 項`:""}</div>
         <div class="tiny dim">${o.trip}・${o.date} 成立・共 ${q} 件</div></div>
       <div style="text-align:right;flex:none">${tag}
         <div style="font-weight:900;font-size:16px;color:var(--pine-deep);margin-top:5px">NT$${nf(o.total)}</div>
         <div class="tiny ${o.pay==="已核對"?"dim":""}" style="${o.pay==="已核對"?"":"color:var(--beni);font-weight:700"}">${o.pay}</div></div>
     </div></summary>
     <div class="obody">
-      ${o.st===0?`<div class="alert gold"><b>小幫手確認中</b><br>現場確認商品與價格後會回報，確認後才會計入對帳單。</div>`:""}
+      ${o.exception==="缺貨"?`<div class="alert beni"><b>這張訂單的商品現場缺貨</b><br>缺貨品項不列入對帳單，不會向你收費。有疑問可從「我的 → 轉接客服」詢問小幫手。</div>`
+        :o.exception==="已取消"?`<div class="alert beni"><b>這張訂單已取消</b><br>不會列入對帳單。</div>`:""}
+      ${!o.exception&&o.st===0?`<div class="alert gold"><b>小幫手確認中</b><br>現場確認商品與價格後會回報，確認後才會計入對帳單。</div>`:""}
       <div class="hr" style="margin:10px 0"></div>
       ${o.items.map(i=>`<div class="row" style="margin-bottom:8px">
         <div class="zoomable" style="width:38px;height:38px;font-size:17px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;flex:none"
-          onclick="lightbox('emoji','${"$"}{i.e}','${"$"}{esc(i.n)}')">${i.e}</div>
+          onclick="lightbox('emoji','${jsq(i.e)}','${jsq(i.n)}')">${i.e}</div>
         <div style="flex:1;min-width:0"><div class="sm">${esc(i.n)}</div>
           <div class="tiny dim">× ${i.q}　税込 ¥${nf(i.jpy)}　
             <span style="color:${i.ist==="已到貨"?"var(--pine)":"var(--ink-3)"};font-weight:700">${i.ist}</span></div></div>
@@ -1964,8 +1964,9 @@ async function doPay(sid){
   if(w==="bank"){
     $("#payzone").innerHTML=`
       <div class="alert pine" style="margin-top:14px">
-        ${SHOP.bankName}（${SHOP.bankCode}）　<span class="code">${SHOP.bankAccount}</span>
-        <button class="link" style="margin-left:6px" onclick="copyText('${SHOP.bankAccount}','帳號')">複製</button><br>
+        ${SHOP.bankAccount?`${SHOP.bankName}（${SHOP.bankCode}）　<span class="code">${SHOP.bankAccount}</span>
+        <button class="link" style="margin-left:6px" onclick="copyText('${jsq(SHOP.bankAccount)}','帳號')">複製</button><br>`
+        :`<b>匯款帳號暫時無法顯示</b>，請改用信用卡或 ATM，或從「我的 → 轉接客服」向小幫手索取。<br>`}
         戶名 周○芳・金額 NT$${nf(t.total)}</div>
       <div class="field" style="margin-top:12px"><label>轉出帳號後五碼</label>
         <input id="l5" maxlength="5" inputmode="numeric" placeholder="例如 31007"></div>
@@ -2171,7 +2172,6 @@ setInterval(()=>{
   const c=$("#tripCount"); if(c)c.innerHTML=tripCount();
   const tc=$("#tripCount"); if(tc)tc.innerHTML=tripCount();
   const cc=$("#cartClock"); if(cc)cc.textContent=tripLeftTxt();
-  const ll=$("#liveLeft"); if(ll)ll.textContent=liveLeft();
 },1000);
 $("#phone").addEventListener("scroll",e=>$("#topbar").classList.toggle("stuck",e.target.scrollTop>6),{passive:true});
 window.addEventListener("scroll",()=>$("#topbar").classList.toggle("stuck",window.scrollY>6),{passive:true});
