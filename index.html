@@ -480,6 +480,8 @@ var CFG = {
   base   : "/api/v1",   // 由 vercel.json rewrites 代理到後端 japan-system，瀏覽器視為同網域
   mock   : true,        // ← 後端端點就緒後改成 false
   timeout: 12000,       // 單次請求逾時（ms）
+  pollMs : 4000,        // 拍照辨識完成後的輪詢間隔（後端無推播管線，改由前台輪詢 /cart/list）
+  pollMax: 15,          // 最多輪詢次數（約 1 分鐘）
   retry  : 2            // 僅對網路錯誤與 5xx 重試
 };
 var AUTH = { idToken:null, ready:false };
@@ -533,6 +535,7 @@ function paintNet(){
 const G_=(p,label)=>call(p,{},label);
 const P_=(p,body,label)=>call(p,{method:"POST",body,idem:uuid()},label);
 var API={
+  health       : ()=>call("/health",{retry:0},""),        // 公開端點，不需 token
   profile      : ()=>G_("/me/profile","載入會員資料"),
   meUpdate     : (b)=>P_("/me/update",b,"更新資料"),
   home         : ()=>G_("/home/summary","載入首頁"),
@@ -624,10 +627,54 @@ async function mockApi(path,method,body){
       v_bank:"(009) 彰化銀行",v_expire_at:new Date(Date.now()+3*864e5).toISOString()};
     return {flow:"redirect",action:"https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",fields:{MerchantTradeNo:"EC"+Date.now()}};
   }
+  if(path==="/health") return {status:"ok",db:{up:true}};
   if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops};
   return {mock:true};
 }
 function mockInvoice(){ return {st:"issued",no:"AB-"+Math.floor(1e7+Math.random()*9e7),date:now(),carrier:DB.me.carrier}; }
+
+/* 後端整個不通時的畫面：與其讓客人看到一堆錯誤，不如講清楚 */
+function maintenance(){
+  const el=$("#view"); if(!el) return;
+  el.innerHTML=`<div class="wrap"><div class="empty" style="padding:70px 22px">
+    <div style="font-size:38px">🛠️</div>
+    <h3>系統維護中</h3>
+    <p>目前暫時無法連線，通常幾分鐘內就會恢復。<br>急件請直接在 LINE 聊天室找小幫手。</p>
+    <button class="btn primary" style="margin-top:16px" onclick="boot()">重新連線</button></div></div>`;
+  const nav=$(".tabs"); if(nav) nav.style.display="none";
+}
+
+/* 拍照下單：後端辨識完成後不推播，由前台輪詢 /cart/list 取回結果 */
+var POLLS={};
+function stopPoll(cid){ if(POLLS[cid]){ clearTimeout(POLLS[cid].t); delete POLLS[cid]; } }
+function pollOcr(cid,line){
+  if(CFG.mock||!cid) return;                       // 示範模式由本機流程直接補上結果
+  stopPoll(cid);
+  const st={n:0,t:null}; POLLS[cid]=st;
+  const tick=async()=>{
+    if(POLLS[cid]!==st) return;
+    if(document.hidden){ st.t=setTimeout(tick,CFG.pollMs); return; }   // 切到背景時不浪費流量
+    st.n++;
+    if(st.n>CFG.pollMax){                          // 超時：不再等，讓客人自己補
+      stopPoll(cid);
+      if(line&&line.p==null){ line.note="辨識較久，可先自行填寫名稱與價格"; render(); }
+      return;
+    }
+    try{
+      const list=await API.cartList();
+      const c=(list||[]).find(x=>x.cart_id===cid);
+      if(!c){ stopPoll(cid); return; }             // 已被移除或已下單
+      if(c.price_twd!=null||c.ai_confidence!=="low"){
+        const l=S.cart.find(x=>x.cid===cid);
+        if(l){ const m=M.cart(c); Object.assign(l,m,{k:l.k,img:l.img||m.img}); }
+        stopPoll(cid); render(); toast("辨識完成，請確認商品與價格",2600);
+        return;
+      }
+    }catch(e){ /* 單次失敗不中斷，下一輪再試 */ }
+    st.t=setTimeout(tick,CFG.pollMs);
+  };
+  st.t=setTimeout(tick,CFG.pollMs);
+}
 
 /* =========================================================================
    執行環境 — 同一套程式碼跑兩種情境
@@ -718,6 +765,8 @@ async function boot(){
   const okAuth=await initLiff(); if(!okAuth) return;
   try{
     if(!CFG.mock){
+      const h=await API.health().catch(()=>null);      // 後端不通就不用再打 6 支 API
+      if(h&&h.status==="down"){ maintenance(); return; }
       const [home,me,cart,wishes,orders,st]=await Promise.all([
         API.home(),API.profile(),API.cartList(),API.wishList(),API.orderList(),API.stmtList()]);
       M.me(me);
@@ -949,6 +998,7 @@ function rmK(k){
   const l=S.cart.find(x=>x.k===k);
   if(l&&l.src==="broadcast") return dropAsk(k,l);
   S.cart=S.cart.filter(x=>x.k!==k);syncBadge();render();toast("已移除");
+  if(l&&l.cid) stopPoll(l.cid);
   if(l&&l.cid) API.cartRemove(l.cid).catch(()=>{ S.cart.push(l); syncBadge(); render(); });}
 function dropAsk(k,l){
   openSheet("取消喊單",`
@@ -1541,7 +1591,9 @@ async function onOrderPhoto(ev){
     S.cart.push(imgLine); syncBadge(true);
     API.cartAddImage({file_name:name,orig_name:f.name,mime:f.type,data:e.target.result})
       .then(r=>{ if(r&&r.cart_id){ imgLine.cid=r.cart_id;
-        if(!CFG.mock) Object.assign(imgLine,{n:r.name,nja:r.name_ja||"",jpy:r.jpy_taxed,p:r.price_twd,conf:r.ai_confidence,note:r.note||""}); render(); } })
+        if(!CFG.mock){ Object.assign(imgLine,{n:r.name,nja:r.name_ja||"",jpy:r.jpy_taxed,p:r.price_twd,conf:r.ai_confidence,note:r.note||""});
+          if(r.price_twd==null) pollOcr(r.cart_id,imgLine); }
+        render(); } })
       .catch(()=>{ S.cart=S.cart.filter(x=>x!==imgLine); syncBadge(); render(); });
     const m2=$("#ocrmsg"); if(m2) m2.innerHTML=`<span style="color:var(--pine);font-weight:700">✓ 辨識完成</span>`;
     await wait(700); closeSheet(); go("cart");
