@@ -477,7 +477,7 @@ var FX = { cvs:70, home:120 };
    身分一律送 LIFF idToken，前端不自行傳 userId。
    ========================================================================= */
 var CFG = {
-  liffId : "YOUR_LIFF_ID",
+  liffId : "2011699944-c5n725TF",
   base   : "/api/v1",   // 與 japan-system 同網域（web/liff/），不需 CORS
   mock   : true,        // ← 後端端點就緒後改成 false
   timeout: 12000,       // 單次請求逾時（ms）
@@ -1049,7 +1049,7 @@ function doShout(no){
   const n=Math.max(1,parseInt($("#sq").value||"1",10));
   closeSheet(); shout(no,n,true);
 }
-function liveWishPhoto(){ wishForm("photo"); }
+
 
 /* ---------- 門市選擇 ---------- */
 function pickStore(){
@@ -1199,68 +1199,12 @@ function checkout(){
 
 /* ---------- 訂單 ---------- */
 function setOF(v){S.oFilter=v;render();}
-function cancelOrder(id){
-  const o=DB.orders.find(x=>x.id===id); if(!o||o.st!==0)return;
-  openSheet("取消訂單",
-   `<p class="sm" style="color:var(--ink-2);margin-top:0">確定要取消 <b>${o.id}</b>？<br>名額會立即釋出給其他團員，此動作無法復原。</p>`,
-   `<button class="btn danger block" onclick="doCancel('${id}')">確定取消訂單</button>
-    <button class="btn quiet block" style="margin-top:8px" onclick="closeSheet()">先不要</button>`);
-}
-function doCancel(id){
-  const i=DB.orders.findIndex(x=>x.id===id),o=DB.orders[i];
 
-  DB.orders.splice(i,1);closeSheet();syncBadge();render();toast("訂單已取消，名額已釋出");
-}
-function payUpload(id){
-  const o=DB.orders.find(x=>x.id===id);
-  openSheet("上傳付款證明",`
-    <div class="alert pine" style="margin-top:0">
-      應付金額 <b>NT$${nf(o.total)}</b><br>
-      國泰世華 (013)　<span class="code">8123-4567-8901</span>
-      <button class="link" style="margin-left:6px" onclick="copyText('81234567890','帳號')">複製</button><br>
-      戶名　周○芳</div>
-    <div class="field" style="margin-top:14px"><label>轉出帳號後五碼</label>
-      <input id="l5" maxlength="5" inputmode="numeric" placeholder="例如 48210"></div>
-    <label class="drop" style="display:block;cursor:pointer">
-      <b>選擇轉帳收據截圖</b>
-      <div class="tiny dim">JPG／PNG，上傳後自動辨識金額並核對</div>
-      <input type="file" accept="image/*" style="display:none" onchange="onPayFile(event,'${id}')"></label>
-    <div id="payzone"></div>`);
-}
-function onPayFile(ev,id){
-  const f=ev.target.files&&ev.target.files[0]; if(!f)return;
-  const r=new FileReader();
-  r.onload=async e=>{
-    const o=DB.orders.find(x=>x.id===id);
-    const l5=($("#l5")&&$("#l5").value.trim())||String(Math.floor(10000+Math.random()*89999));
-    $("#payzone").innerHTML=`<div class="row" style="margin-top:12px;align-items:flex-start">
-      <img class="zoomable" src="${e.target.result}" onclick="lightbox('img',this.src,'付款證明')" style="width:78px;height:78px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
-      <div style="flex:1"><b class="sm">${esc(f.name)}</b>
-        <div class="tiny dim">${(f.size/1024).toFixed(0)} KB</div>
-        <div class="tiny" style="margin-top:6px" id="ocrmsg"><span class="spin"></span> 辨識中…</div></div></div>`;
-    await wait(1500);
-    $("#ocrmsg").innerHTML=`<span class="spin"></span> 比對金額 NT$${nf(o.total)}…`;
-    await wait(1300);
-    $("#ocrmsg").innerHTML=`<span style="color:var(--pine);font-weight:700">✓ 核對成功・後五碼 ${l5}</span>`;
-    o.pay={last5:l5,at:now(),img:e.target.result}; o.st=1; o.hold=null; o.log[1]=now();
-    syncBadge(); await wait(900);
-    closeSheet(); render(); toast("付款已確認，訂單轉為「待採購」",2600);
-  };
-  r.readAsDataURL(f);
-}
-function toggleMerge(id){S.mergeSel.has(id)?S.mergeSel.delete(id):S.mergeSel.add(id);render();}
-function doMerge(){
-  const sel=DB.orders.filter(o=>S.mergeSel.has(o.id));
-  if(sel.length<2){toast("請選擇兩張以上的訂單");return;}
-  const keep=sel[sel.length-1], saved=(sel.length-1)*keep.ship;
-  keep.items=sel.flatMap(o=>o.items);
-  keep.total=sel.reduce((a,o)=>a+o.total,0)-saved;
-  keep.feeNote=`已合併 ${sel.length} 張訂單，台灣端運費僅收一次（省下 NT$${nf(saved)}）`;
-  keep.log[keep.st]=now();
-  DB.orders=DB.orders.filter(o=>o===keep||!S.mergeSel.has(o.id));
-  S.mergeSel.clear();S.open.add(keep.id);render();
-  toast(`已合併為 ${keep.id}，運費省下 NT$${nf(saved)}`,2800);
-}
+
+
+
+
+
 function reorder(id){
   const o=DB.orders.find(x=>x.id===id);
   o.items.forEach((it,i)=>{ const line={k:"R"+Date.now()+i,src:"text",ref:"RE"+Date.now()+i,
@@ -1366,19 +1310,7 @@ function wishToCart(id){
   API.wishToCart(id).then(r=>{ if(r&&r.cart_item) wl.cid=r.cart_item.cart_id; })
     .catch(()=>{ S.cart=S.cart.filter(x=>x!==wl); w.st="quoted"; w.orderId=null; syncBadge(); render(); });
   toast("已加入購物車，可與其他商品一起結帳");}
-function wishToOrder(id){
-  const w=DB.wishes.find(x=>x.id===id);if(!w||w.st!=="quoted")return;
-  const d=new Date();DB.seq++;const ship=FX.cvs;
-  const o={id:`HB-${String(d.getFullYear()).slice(2)}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(DB.seq)}`,
-    trip:TRIP.name,date:`${d.getMonth()+1}/${pad(d.getDate())}`,st:0,
-    items:[{n:w.title,q:w.qty,p:w.quote,e:"⭐",jpy:0,ist:"待採買"}],total:w.quote*w.qty+ship,ship,
-    pay:"待付款",split_shipped:false,stmt:null,
-    pickup:DB.me.pickup,pickupAddr:DB.me.pickupAddr,
-    inv:"手機載具 "+DB.me.carrier,note:"由許願 "+w.id+" 轉入",log:{0:now()},splits:null};
-  DB.orders.unshift(o);w.st="converted";w.orderId=o.id;
-  S.open.add(o.id);S.oFilter="live";syncBadge();go("orders");
-  toast(`已轉為訂單 ${o.id}，請於 24 小時內付款`,2800);
-}
+
 function wishKeep(id){const w=DB.wishes.find(x=>x.id===id),prev=w.st;w.st="kept";render();toast("已保留至下一團，開團時會通知你");
   API.wishKeep(id).catch(()=>{ w.st=prev; render(); });}
 function wishDrop(id){const w=DB.wishes.find(x=>x.id===id);DB.wishes=DB.wishes.filter(x=>x.id!==id);syncBadge();render();toast("已刪除此筆許願");
@@ -1418,17 +1350,7 @@ function creditInfo(){
       <b style="color:var(--ink)">怎麼恢復</b><br>
       連續兩團正常完成結帳，紀錄自動歸零。</div>`);
 }
-function payHistory(){
-  const rows=DB.stmts.filter(t=>t.pay==="已核對");
-  openSheet("付款紀錄", rows.length?`<div class="list">${rows.map(t=>`<div class="item">
-      <div class="ph ${t.img?"zoomable":""}" ${t.img?`onclick="lightbox('img','${"$"}{t.img}','${"$"}{t.id} 轉帳截圖')"`:""}>${t.img?`<img src="${t.img}">`:"🧾"}</div>
-      <div class="info"><b>${t.id}</b>
-        <div class="tiny dim">${t.paidAt}・後五碼 ${t.last5}・${t.orders.length} 筆訂單</div>
-        <div class="sm" style="font-weight:700;color:var(--pine-deep);margin-top:3px">NT$${nf(t.total)}</div></div>
-      <span class="pill pine" style="align-self:center">已核對</span></div>`).join("")}</div>`
-    :`<div class="empty" style="padding:36px 10px"><div style="font-size:34px">🧾</div>
-      <h3>目前沒有付款紀錄</h3><p>完成第一筆付款後會顯示在這裡。</p></div>`);
-}
+
 function terms(){
   openSheet("代購須知",`<div class="sm" style="color:var(--ink-2);line-height:1.95">
     <b style="color:var(--ink)">缺貨處理</b><br>日本現場缺貨將於採購當日通知，該品項全額退款，不影響其他品項。<br><br>
@@ -2116,9 +2038,7 @@ function onStmtFile(ev,sid){
   };
   r.readAsDataURL(f);
 }
-function holdTxt(o){const d=o.hold-new Date();
-  if(d<=0)return "已逾時";
-  return `${Math.floor(d/36e5)} 小時 ${pad(Math.floor(d/6e4)%60)} 分 ${pad(Math.floor(d/1e3)%60)} 秒`;}
+
 function vMe(){
   const N=DB.me.notify;
   const mine=DB.orders;
@@ -2215,6 +2135,20 @@ function saveProfile(){
 }
 function blank(i,t,d,c,tab){return `<div class="empty"><div style="font-size:44px">${i}</div>
   <h3>${t}</h3><p>${d}</p><button class="btn primary" onclick="go('${tab}')">${c}</button></div>`;}
+
+/* 複製帳號／繳費帳號：先用剪貼簿 API，LINE 內建瀏覽器不支援時改用選取複製 */
+async function copyText(text,label){
+  const done=()=>toast("已複製"+(label||"")+"："+text,2200);
+  try{ if(navigator.clipboard&&window.isSecureContext){ await navigator.clipboard.writeText(String(text)); return done(); } }catch(e){}
+  try{
+    const t=document.createElement("textarea"); t.value=String(text); t.setAttribute("readonly","");
+    t.style.cssText="position:fixed;top:-1000px;opacity:0"; document.body.appendChild(t);
+    t.select(); t.setSelectionRange(0,t.value.length);
+    const ok=document.execCommand("copy"); t.remove();
+    if(ok) return done();
+  }catch(e){}
+  toast((label||"")+" "+text+"（請長按手動複製）",3200);
+}
 
 /* ---------- 電腦版：底部分頁列 ↔ 頂部導覽 ---------- */
 const DESKTOP=(window.matchMedia&&window.matchMedia("(min-width:860px)"))||{matches:false};  // 舊版瀏覽器沒有 matchMedia 時當手機版
