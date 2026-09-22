@@ -23,14 +23,11 @@ input,select,textarea{font:inherit;color:inherit}
 .phone{width:100%;max-width:412px;background:var(--paper);position:relative;min-height:100vh;
 padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px);overflow:hidden}
 .cap{display:none}
-@media(min-width:680px){.stage{padding:32px 20px 40px;background:#DCE3DC;align-items:center;gap:36px}
-.phone{border-radius:30px;box-shadow:0 20px 56px rgba(20,45,38,.2);border:1px solid #C8D2C8;
-min-height:min(880px,calc(100vh - 96px));max-height:min(880px,calc(100vh - 96px));overflow-y:auto;
-padding-bottom:calc(var(--tab-h) + 20px);flex:none}
-.cap{display:block;max-width:270px;color:var(--ink-2);font-size:13.5px;line-height:1.9}
-.cap h3{margin:0 0 6px;font-size:17px;color:var(--pine);font-weight:900}
-.cap .k{color:var(--ink-3);font-size:11.5px;letter-spacing:.16em;margin-bottom:14px}}
-@media(min-width:680px) and (max-width:900px){.cap{display:none}}
+/* 平板（600–859）：沿用手機版面，內容置中加寬 */
+@media(min-width:600px) and (max-width:859px){
+.phone{max-width:640px}
+.tabs{max-width:640px}
+.netbar{max-width:640px}}
 .topbar{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 18px 10px;display:flex;
 align-items:center;gap:10px;border-bottom:1px solid transparent}
 .topbar.stuck{border-bottom-color:var(--line)}
@@ -241,7 +238,7 @@ letter-spacing:.04em;flex:none;align-self:flex-start}
 .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:412px;height:var(--tab-h);
 background:rgba(255,255,255,.97);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);
 z-index:40;padding-bottom:env(safe-area-inset-bottom)}
-@media(min-width:680px){.tabs{position:absolute;bottom:0;left:0;transform:none;border-radius:0 0 30px 30px}}
+
 .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-3);font-size:10.5px;font-weight:500;position:relative}
 .tab.on{color:var(--pine);font-weight:700}.tab svg{width:21px;height:21px}
 .tab .badge{top:6px;right:calc(50% - 20px)}
@@ -262,7 +259,7 @@ background:rgba(255,255,255,.12);padding:6px 11px;border-radius:999px}
 background:linear-gradient(90deg,transparent,var(--pine),transparent);background-size:40% 100%;
 background-repeat:no-repeat;animation:nb 1.1s linear infinite}
 @keyframes nb{0%{background-position:-40% 0}100%{background-position:140% 0}}
-@media(min-width:680px){.netbar{position:absolute;border-radius:30px 30px 0 0}}
+
 .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(var(--tab-h) + 18px);
 background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13.5px;font-weight:500;opacity:0;
 pointer-events:none;transition:opacity .22s,transform .22s;z-index:60;max-width:88%;text-align:center}
@@ -284,6 +281,67 @@ max-height:90vh;display:flex;flex-direction:column}
 .skel{background:linear-gradient(90deg,var(--line-soft) 25%,var(--surface-2) 37%,var(--line-soft) 63%);
 background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
 @keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* =================== 電腦版（≥ 860px） =================== */
+.pill{white-space:nowrap}
+.hg,.cg{display:block}
+.lcgrid{display:block}
+@media(min-width:860px){
+  body{background:var(--paper)}
+  .stage{display:block}
+  .phone{max-width:none;min-height:100vh;padding-bottom:56px;overflow:visible}
+  /* 頂部導覽：品牌｜分頁｜ */
+  .topbar{padding:12px max(28px,calc((100% - 1120px)/2 + 28px));background:rgba(255,255,255,.96);
+    border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2) blur(6px)}
+  .topbar .iconbtn{display:none}
+  .topbar .tabs{position:static;transform:none;width:auto;max-width:none;height:auto;background:none;border:none;
+    display:flex;gap:4px;margin-left:36px;padding:0;grid-template-columns:none}
+  .topbar .tab{flex-direction:row;gap:7px;font-size:14.5px;padding:9px 15px;border-radius:10px;color:var(--ink-2)}
+  .topbar .tab svg{width:18px;height:18px}
+  .topbar .tab:hover{background:var(--line-soft)}
+  .topbar .tab.on{background:var(--pine-soft);color:var(--pine-deep)}
+  .topbar .tab .badge{position:static;margin-left:2px}
+  .netbar{max-width:none}
+  /* 內容區 */
+  #view{max-width:1120px;margin:0 auto;padding:10px 28px 0}
+  #view .wrap{padding:0}
+  .h2{font-size:18px;margin:28px 0 12px}
+  /* 首頁：左主右側 */
+  .hg{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:36px;align-items:start}
+  .hg-side{position:sticky;top:84px}
+  .hg-side > .h2:first-child,.hg-main > .h2:first-child{margin-top:12px}
+  .trip{margin-top:14px}
+  .lcgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .lcgrid .livecard{margin-bottom:0}
+  .lcgrid + .btn{margin-top:14px}
+  /* 購物車：左品項右結帳 */
+  .cg{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,1fr);gap:36px;align-items:start}
+  .cg-side{position:sticky;top:84px;background:var(--surface);border:1px solid var(--line-soft);
+    border-radius:16px;padding:6px 20px 20px}
+  .cg-side > .h2:first-child{margin-top:14px}
+  /* 其他分頁：閱讀寬度 */
+  #view[data-tab="orders"] .wrap,#view[data-tab="wish"] .wrap,#view[data-tab="me"] .wrap{max-width:860px;margin:0 auto}
+  #view[data-tab="live"] .wrap{max-width:1000px;margin:0 auto}
+  .empty{padding:90px 24px}
+  /* 彈出視窗 → 畫面中央對話框 */
+  .sheet{top:50%;bottom:auto;left:50%;transform:translate(-50%,-46%);opacity:0;pointer-events:none;
+    max-width:560px;border-radius:18px;max-height:86vh;overflow:hidden;
+    transition:transform .22s cubic-bezier(.3,.8,.4,1),opacity .18s}
+  .sheet.show{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+  .grab{display:none}
+  .shhead{padding-top:18px}
+  .toast{bottom:32px}
+  /* 滑鼠操作回饋 */
+  .btn,.ecard,.livebar,.chip,.opt,.mrow,.store,.payopt,details.order > summary{cursor:pointer}
+  .btn:hover{filter:brightness(1.06)}
+  .ecard{transition:border-color .15s,transform .15s}
+  .ecard:hover{border-color:var(--pine);transform:translateY(-1px)}
+  .livecard{transition:border-color .15s}
+  .livecard:hover{border-color:var(--line)}
+  .mrow:hover,.store:hover{background:var(--surface-2)}
+  details.order{transition:border-color .15s}
+  details.order:hover{border-color:var(--line)}
+}
 </style>
 </head>
 <body>
@@ -1415,7 +1473,7 @@ function vHome(){
   const pend=S.cart.filter(l=>l.st==="pending");
   const mine=DB.orders.filter(o=>o.trip===TRIP.name).length + S.cart.length;
   const openBC=DB.broadcast.filter(b=>b.left>0&&b.deadline!=="已截止");
-  return `<div class="wrap">
+  return `<div class="wrap"><div class="hg"><div class="hg-main">
     ${unpaid.length?`<button class="todo" style="width:100%;text-align:left" onclick="S.oFilter='stmt';go('orders')">
       <span style="font-size:19px">🧾</span>
       <span><b>${unpaid.length} 張對帳單待付款</b><br><span class="tiny" style="opacity:.85">收到後 ${SHOP.payDeadlineDays} 天內完成轉帳</span></span>
@@ -1456,7 +1514,7 @@ function vHome(){
         <br><span class="tiny" style="opacity:.88">${openBC.length} 項可喊・${esc(DB.broadcast[0].deadline)} 截止</span></span>
       <span class="ar">›</span></div>
     <div style="height:11px"></div>
-    ${openBC.slice(0,2).map(bcCard).join("")}
+    <div class="lcgrid">${openBC.slice(0,2).map(bcCard).join("")}</div>
     ${openBC.length>2?`<button class="btn quiet block" onclick="go('live')">看全部 ${openBC.length} 項喊單 ›</button>`:""}
     `:`
     <div class="h2">📣 現場連線喊單</div>
@@ -1464,6 +1522,7 @@ function vHome(){
       <div class="sm dim">目前沒有進行中的連線</div>
       <div class="tiny dim" style="margin-top:4px">小幫手開播時會推播通知你</div></div>`}
 
+    </div><div class="hg-side">
     <div class="h2">隨時都能下單</div>
     <div class="entry">
       <button class="ecard" onclick="orderPhoto()">
@@ -1492,7 +1551,7 @@ function vHome(){
     <p class="tiny dim" style="text-align:center;margin:20px 0 8px;line-height:1.75">
       所有商品由小幫手在日本當地實體店面現場採買<br>
       現場缺貨會即時通知，該品項不列入對帳單</p>
-  </div>`;
+  </div></div></div>`;
 }
 
 function bcCard(it){
@@ -1634,7 +1693,7 @@ function vCart(){
   const ship=S.pick==="cvs"?FX.cvs:FX.home;
   const sub=conf.reduce((a,l)=>a+(l.p||0)*l.q,0);
   const noPrice=conf.filter(l=>!l.p).length;
-  return `<div class="wrap">
+  return `<div class="wrap"><div class="cg"><div class="cg-main">
     <div class="h2">購物車 <span class="dim tiny" style="font-weight:400">${cCount()} 件</span></div>
     <div class="alert pine" style="margin-top:0;display:flex;align-items:center;gap:9px">
       <span style="font-size:16px">✈️</span>
@@ -1648,7 +1707,8 @@ function vCart(){
     ${conf.length?`<div class="h2" style="margin-top:4px">已確認 <span class="dim tiny" style="font-weight:400">${conf.length} 筆</span></div>
       ${conf.map(cartLine).join("")}`:""}
     ${!conf.length?`<p class="tiny dim" style="text-align:center;margin:16px 0">先確認上面的品項，才能送出訂單。</p>
-      <button class="btn quiet block" onclick="go('home')">繼續下單</button></div>`:`
+      <button class="btn quiet block" onclick="go('home')">繼續下單</button></div></div></div>`:`
+    </div><div class="cg-side">
     <div class="h2">取貨與發票</div>
     <div class="field"><label>取貨方式</label><div class="opts">
       <button class="opt ${S.pick==="cvs"?"on":""}" onclick="setPick('cvs')">超商取貨<br><span class="tiny dim">NT$${FX.cvs}</span></button>
@@ -1681,7 +1741,7 @@ function vCart(){
       送出後由小幫手在現場確認商品與價格，確認後計入對帳單。<br>
       每月 1 日、16 日結算，收到對帳單後 ${SHOP.payDeadlineDays} 天內完成轉帳。</p>
     <button class="btn primary block" style="margin-top:12px" onclick="reviewOrder()">下一步・確認訂單</button>
-    <button class="btn quiet block" style="margin-top:9px" onclick="go('home')">繼續下單</button></div>`}`;
+    <button class="btn quiet block" style="margin-top:9px" onclick="go('home')">繼續下單</button></div></div></div>`}`;
 }
 function cartLine(l){
   const c=SRC[l.src], cf=l.conf?CONF[l.conf]:null;
@@ -1726,7 +1786,7 @@ function vLive(){
     </div>
     <div class="alert pine" style="margin-top:12px"><b>也可以直接在群組喊</b><br>${esc(LIVE.hint)}　系統會自動放進你的購物車。</div>
     <div class="h2">現場推播 <span class="dim tiny" style="font-weight:400">由新到舊</span></div>
-    ${DB.broadcast.map(bcCard).join("")}
+    <div class="lcgrid">${DB.broadcast.map(bcCard).join("")}</div>
     <div class="sumbox" style="margin-top:14px;background:var(--gold-soft);border-color:var(--gold-soft)">
       <div class="row" style="align-items:flex-start"><span style="font-size:19px">📷</span>
         <div style="flex:1"><b style="font-size:14px">推播裡沒有、但你想要？</b>
@@ -2156,8 +2216,19 @@ function saveProfile(){
 function blank(i,t,d,c,tab){return `<div class="empty"><div style="font-size:44px">${i}</div>
   <h3>${t}</h3><p>${d}</p><button class="btn primary" onclick="go('${tab}')">${c}</button></div>`;}
 
+/* ---------- 電腦版：底部分頁列 ↔ 頂部導覽 ---------- */
+const DESKTOP=(window.matchMedia&&window.matchMedia("(min-width:860px)"))||{matches:false};  // 舊版瀏覽器沒有 matchMedia 時當手機版
+function placeNav(){
+  const nav=$(".tabs"), top=$("#topbar"), brand=top&&top.querySelector(".brand"), view=$("#view");
+  if(!nav||!top||!brand||!view) return;
+  if(DESKTOP.matches){ if(nav.parentNode!==top) brand.after(nav); }
+  else if(nav.previousElementSibling!==view){ view.after(nav); }
+}
+if(DESKTOP.addEventListener) DESKTOP.addEventListener("change",placeNav); else if(DESKTOP.addListener) DESKTOP.addListener(placeNav);
+
 /* ---------- Render ---------- */
 function render(){
+  $("#view").dataset.tab=S.tab; placeNav();
   $("#view").innerHTML={home:vHome,live:vLive,wish:vWish,cart:vCart,orders:vOrders,me:vMe}[S.tab]();
   $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.t===(S.tab==="live"?"home":S.tab)));
   syncBadge();
