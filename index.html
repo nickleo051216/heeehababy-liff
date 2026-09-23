@@ -342,6 +342,16 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
   details.order{transition:border-color .15s}
   details.order:hover{border-color:var(--line)}
 }
+/* 我的：LINE 大頭貼、訂單狀態捷徑、小連結 */
+.ava img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.stats.four{grid-template-columns:repeat(4,1fr)}
+button.stat{font:inherit;cursor:pointer;color:inherit}
+button.stat:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.stat.hot b{color:var(--beni)}
+.linkrow{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;margin:20px 0 6px}
+.linkrow button{background:none;border:0;padding:4px 2px;font:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.chipbar{display:flex;align-items:center;gap:8px;margin:-2px 0 12px;font-size:12.5px;color:var(--ink-2)}
+.chipbar button{background:var(--pine-soft);color:var(--pine-deep);border:0;border-radius:99px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
 /* 歡迎頁（LINE 以外的瀏覽器、還沒登入時）與載入畫面 */
 body.guest .tabs,body.guest .topbar .iconbtn{display:none!important}
 .welcome{max-width:440px;margin:0 auto;padding:34px 18px 44px;text-align:center}
@@ -815,6 +825,7 @@ async function initLiff(){
       toast("LINE 登入資訊不完整，請稍後再試或聯絡官方客服",3200); loadFailed(); return false;
     }
     AUTH.ready=true; ENV.ready=true;
+    loadLineExtras();
     routeDeepLink();
     cleanLoginParams();
     return true;
@@ -1444,7 +1455,14 @@ async function checkoutLive(C){
 }
 
 /* ---------- 訂單 ---------- */
-function setOF(v){S.oFilter=v;render();}
+function setOF(v){S.oFilter=v;S.oStage=null;render();}
+/* 「我的」頁的訂單狀態捷徑：點了直接看那一類訂單 */
+var STAGES={
+  quote:{t:"待報價", f:o=>!o.exception&&o.st===0},
+  ship :{t:"待出貨", f:o=>!o.exception&&(o.st===1||o.st===2)},
+  pick :{t:"待取貨", f:o=>!o.exception&&o.st===3}
+};
+function goStage(k){ S.oStage=k; S.oFilter="live"; go("orders"); }
 
 
 
@@ -1589,6 +1607,56 @@ function invoiceList(){
     :`<div class="empty" style="padding:36px 10px"><div style="font-size:34px">🧾</div>
       <h3>還沒有電子發票</h3><p>完成付款後會自動開立並顯示在這裡。</p></div>`);
 }
+/* 登出只在 LINE 以外的瀏覽器有意義：LINE 裡的身分就是這支手機上的 LINE 帳號 */
+/* LINE 大頭貼與是否已加好友：拿不到就算了，不影響其他功能 */
+async function loadLineExtras(){
+  try{ const p=await liff.getProfile(); if(p&&p.pictureUrl){ DB.me.picture=p.pictureUrl; if(S.tab==="me") render(); } }catch(_){}
+  try{ const f=await liff.getFriendship(); ENV.friend=!!(f&&f.friendFlag); if(S.tab==="me") render(); }catch(_){}
+}
+function canLogout(){ return !CFG.mock && ENV.sdk && !ENV.inClient; }
+function askLogout(){
+  openSheet("登出",`<p class="sm" style="color:var(--ink-2);margin-top:0;line-height:1.8">
+    登出後，這個瀏覽器不會再記得你的 LINE 登入。購物車與訂單都保存在帳號裡，下次登入就會回來。</p>`,
+    `<button class="btn primary block" onclick="doLogout()">確定登出</button>
+     <button class="btn quiet block" style="margin-top:8px" onclick="closeSheet()">取消</button>`);
+}
+function doLogout(){
+  try{ liff.logout(); }catch(_){}
+  AUTH.idToken=null; AUTH.ready=false;
+  closeSheet(); toast("已登出",1800);
+  landing();
+}
+/* 隱私權政策：蒐集什麼、為什麼、給誰。內容請官方確認後再對外承諾 */
+function privacy(){
+  openSheet("隱私權政策",`<div class="sm" style="color:var(--ink-2);line-height:1.95">
+    <b style="color:var(--ink)">我們蒐集哪些資料</b><br>
+    LINE 顯示名稱與大頭貼（登入時由 LINE 提供）、你填寫的手機、取貨門市、宅配地址、發票載具，以及你的下單、許願、付款與上傳的商品照片。<br><br>
+    <b style="color:var(--ink)">用在哪裡</b><br>
+    處理訂單、日本採買、出貨與取貨、對帳收款、開立發票，以及透過 LINE 通知你訂單進度。不會用於與代購服務無關的用途。<br><br>
+    <b style="color:var(--ink)">會提供給誰</b><br>
+    只在完成服務所需的範圍內，提供給物流業者（寄送與取貨）、金流業者（付款）與電子發票平台。不會出售你的個人資料。<br><br>
+    <b style="color:var(--ink)">我們不會取得</b><br>
+    你的 LINE 好友名單、聊天內容、Email，也不會代你發送訊息。<br><br>
+    <b style="color:var(--ink)">你的權利</b><br>
+    你可以隨時要求查詢、更正或刪除你的資料，請在 LINE 聊天室告訴小幫手，並附上會員編號。</div>`);
+}
+function aboutShop(){
+  openSheet("關於我們",`<div class="sm" style="color:var(--ink-2);line-height:1.95">
+    <b style="color:var(--ink)">HEEEHABABY 日本嬰幼兒代購</b><br>
+    日本實體店面現場採買，在 LINE 就能跟團、下單、付款。<br><br>
+    <div class="sumbox" style="margin-top:4px">
+      <div class="sumrow"><span>經營公司</span><span>冉冉國際企業有限公司</span></div>
+      <div class="sumrow"><span>客服</span><span>LINE 官方帳號</span></div></div>
+    <button class="btn quiet block" style="margin-top:14px" onclick="openChat()">在 LINE 聯絡我們</button></div>`);
+}
+/* 回到官方帳號的聊天室；帶上會員編號，小幫手一看就知道是誰 */
+var OA_CHAT_URL="https://line.me/R/oaMessage/@378mwpde/";
+function openChat(){
+  const pre=DB.me.memberNo?`?${encodeURIComponent("會員編號 "+DB.me.memberNo+"：")}`:"";
+  const url=OA_CHAT_URL+pre;
+  try{ if(ENV.sdk&&ENV.inClient){ liff.openWindow({url,external:false}); return; } }catch(_){}
+  window.open(url,"_blank","noopener");
+}
 function creditInfo(){
   openSheet("喊單信用",`
     <div class="alert ${DB.me.drops>=3?"beni":DB.me.drops?"gold":"pine"}" style="margin-top:0">
@@ -1620,7 +1688,7 @@ function support(){
     <div class="menu" style="margin-top:12px">
       <button class="mrow" onclick="terms()"><span style="font-size:17px">❓</span>
         <span style="font-weight:500">先看代購須知</span><span class="ar">›</span></button>
-      <button class="mrow" onclick="toast('將關閉視窗並回到 LINE 聊天室');setTimeout(closeSheet,900)">
+      <button class="mrow" onclick="closeSheet();openChat()">
         <span style="font-size:17px">💬</span><span style="font-weight:500">回聊天室詢問</span><span class="ar">›</span></button>
     </div>`);
 }
@@ -2032,7 +2100,9 @@ function vWish(){
 }
 function vOrders(){
   const live=DB.orders.filter(o=>!o.exception&&o.st<4), done=DB.orders.filter(o=>o.exception||o.st>=4);
-  const rows=S.oFilter==="live"?live:S.oFilter==="done"?done:[];
+  let rows=S.oFilter==="live"?live:S.oFilter==="done"?done:[];
+  const stage=S.oFilter==="live"&&S.oStage&&STAGES[S.oStage];
+  if(stage) rows=rows.filter(stage.f);
   return `<div class="wrap">
     <div class="h2">我的訂單</div>
     <button class="btn quiet block" style="margin-bottom:10px" onclick="scanPickup()">
@@ -2042,6 +2112,7 @@ function vOrders(){
       <button class="${S.oFilter==="done"?"on":""}" onclick="setOF('done')">已完成 ${done.length}</button>
       <button class="${S.oFilter==="stmt"?"on":""}" onclick="setOF('stmt')">對帳單 ${DB.stmts.length}</button></div>
     <div style="height:12px"></div>
+    ${stage?`<div class="chipbar">只看「${stage.t}」<button onclick="setOF('live')">看全部 ✕</button></div>`:""}
     ${S.oFilter==="stmt"?vStmt():rows.length?rows.map(orderCard).join("")
       :`<div class="empty" style="padding:40px 10px"><div style="font-size:36px">📦</div>
         <h3>${S.oFilter==="live"?"目前沒有進行中的訂單":"還沒有已完成的訂單"}</h3>
@@ -2327,12 +2398,13 @@ function onStmtFile(ev,sid){
 function vMe(){
   const N=DB.me.notify;
   const mine=DB.orders;
-  const waitQuote=mine.filter(o=>o.st===0).length;
-  const paid=DB.stmts.filter(t=>t.pay==="已核對").reduce((a,t)=>a+t.total,0);
+  const cnt=k=>mine.filter(STAGES[k].f).length;
+  const unpaid=DB.stmts.filter(t=>t.pay!=="已核對").length;
+  const stat=(n,label,on)=>`<button class="stat ${n?"hot":""}" onclick="${on}"><b>${n}</b><span>${label}</span></button>`;
   return `<div class="wrap">
     <div class="h2">我的</div>
     <div class="profile">
-      <div class="ava">👩</div>
+      <div class="ava">${DB.me.picture?`<img src="${esc(DB.me.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='👤'">`:"👤"}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:16px">${esc(DB.me.name)}</div>
         <div class="tiny dim">@${esc(DB.me.nickname)}・${DB.me.joined} 加入</div>
@@ -2341,10 +2413,13 @@ function vMe(){
     </div>
     <button class="btn quiet block" style="margin-top:10px" onclick="editProfile()">編輯個人資料</button>
 
-    <div class="stats">
-      <div class="stat"><b>${mine.length}</b><span>累積訂單</span></div>
-      <div class="stat"><b>${waitQuote}</b><span>待報價</span></div>
-      <div class="stat"><b>${nf(paid)}</b><span>已付金額</span></div></div>
+    <div class="stats four">
+      ${stat(cnt("quote"),"待報價","goStage('quote')")}
+      ${stat(unpaid,"待付款","S.oFilter='stmt';S.oStage=null;go('orders')")}
+      ${stat(cnt("ship"),"待出貨","goStage('ship')")}
+      ${stat(cnt("pick"),"待取貨","goStage('pick')")}</div>
+    ${ENV.friend===false?`<div class="alert gold" style="margin-top:12px"><b>還沒加入官方帳號好友</b><br>
+      加入後才收得到報價、出貨與到貨通知。<a href="${OA_URL}" target="_blank" rel="noopener" style="color:var(--pine);font-weight:700">加入 LINE 好友 ›</a></div>`:""}
 
     <div class="h2">收件與發票</div>
     <div class="menu" style="margin-top:0">
@@ -2375,7 +2450,7 @@ function vMe(){
         <span><span style="font-weight:500">轉接客服</span><br><span class="tiny dim">由小幫手接手，回到 LINE 聊天室</span></span><span class="ar">›</span></button>
     </div>
 
-    <div class="h2">通知設定</div>
+    ${CFG.mock?`<div class="h2">通知設定</div>
     <div class="menu" style="margin-top:0">
       ${[["order","下單確認通知","訂單成立與小幫手確認結果"],
          ["quote","報價完成通知","待報價商品回報價格時"],
@@ -2385,13 +2460,19 @@ function vMe(){
         .map(([k,t,d])=>`<button class="mrow" onclick="toggleNotify('${k}')" aria-pressed="${N[k]}">
           <span style="min-width:0"><span style="font-weight:500">${t}</span><br><span class="tiny dim">${d}</span></span>
           <span class="sw ${N[k]?"on":""}"></span></button>`).join("")}
-    </div>
+    </div>`:""}
 
     <div class="h2">帳號</div>
     <div class="sumbox">
       <div class="sumrow"><span>LINE 綁定</span><span style="color:var(--pine);font-weight:700">${DB.me.status}</span></div>
       <div class="sumrow"><span>綁定時間</span><span>${DB.me.lastBind}</span></div>
-      ${DB.me.memberNo?`<div class="sumrow"><span>會員編號</span><span class="code">${esc(DB.me.memberNo)}</span></div>`:""}
+      ${DB.me.memberNo?`<div class="sumrow"><span>會員編號</span><span><span class="code">${esc(DB.me.memberNo)}</span>
+        <button class="link" style="margin-left:6px" onclick="copyText('${jsq(DB.me.memberNo)}','會員編號')">複製</button></span></div>`:""}
+    </div>
+    <div class="linkrow">
+      <button onclick="privacy()">隱私權政策</button>
+      <button onclick="aboutShop()">關於我們</button>
+      ${canLogout()?`<button onclick="askLogout()">登出</button>`:""}
     </div>
     <p class="tiny dim" style="text-align:center;margin:18px 0 8px;line-height:1.8">
       HEEEHABABY 日本代購</p></div>`;
