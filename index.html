@@ -682,7 +682,7 @@ function relogin(){
   try{
     if(sessionStorage.getItem("relogin")) return false;
     sessionStorage.setItem("relogin","1");
-    liff.logout(); liff.login({redirectUri:location.href}); return true;
+    liff.logout(); liff.login({redirectUri:cleanHref()}); return true;
   }catch(_){ return false; }
 }
 
@@ -755,19 +755,35 @@ async function initLiff(){
     ENV.sdk=true;
     ENV.inClient=liff.isInClient();
     ENV.os=liff.getOS(); ENV.ver=liff.getVersion(); ENV.lang=liff.getLanguage();
-    if(!liff.isLoggedIn()){ liff.login({redirectUri:location.href}); return false; }
+    if(!liff.isLoggedIn()){ liff.login({redirectUri:cleanHref()}); return false; }
     AUTH.idToken=liff.getIDToken();
     if(!AUTH.idToken){                              // LIFF 沒開 openid 權限時會是 null，之後每支 API 都 401
       toast("LINE 登入資訊不完整，請稍後再試或聯絡官方客服",3200); loadFailed(); return false;
     }
     AUTH.ready=true; ENV.ready=true;
     routeDeepLink();
+    cleanLoginParams();
     return true;
   }catch(e){
     toast("LINE 登入失敗："+(e&&e.message||"未知錯誤"),3200);
     return false;
   }
 }
+/* LINE 登入完成後，網址會帶回一次性的授權碼等參數（code、state…）。
+   授權碼已經被 LIFF 用掉、也只能用一次，但留在網址列上不好看，客人分享或截圖時也會一起帶出去，
+   所以登入完成後就拿掉，只保留 ?path= 這類自己的參數。 */
+var LOGIN_PARAMS=["code","state","friendship_status_changed","liffClientId","liffRedirectUri","liff.state","error","error_description"];
+function cleanHref(){
+  try{
+    const u=new URL(location.href);
+    LOGIN_PARAMS.forEach(k=>u.searchParams.delete(k));
+    return u.origin+u.pathname+(u.searchParams.toString()?"?"+u.searchParams.toString():"")+u.hash;
+  }catch(_){ return location.origin+location.pathname; }
+}
+function cleanLoginParams(){
+  try{ const c=cleanHref(); if(c!==location.href) history.replaceState(history.state,"",c); }catch(_){}
+}
+
 /* Deep Link：推播訊息可帶 ?path=orders 直接開到指定頁
    例：https://liff.line.me/{liffId}?path=orders&id=ORD-260901-014 */
 function routeDeepLink(){
@@ -787,7 +803,7 @@ function routeDeepLink(){
 async function shareTrip(){
   const text=`【${TRIP.name}】${TRIP.region} 現場採買中\n收單剩 ${tripLeftTxt()}，一起跟團 👇`;
   if(!can("shareTargetPicker")){
-    try{ await navigator.clipboard.writeText(text+"\n"+location.href);
+    try{ await navigator.clipboard.writeText(text+"\nhttps://liff.line.me/"+CFG.liffId);   // 分享正式入口，不帶目前網址的參數
       toast("已複製團次資訊，可直接貼到聊天室",2600); }
     catch(e){ toast("請在 LINE 內開啟才能分享",2600); }
     return;
