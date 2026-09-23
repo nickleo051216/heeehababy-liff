@@ -446,6 +446,39 @@ function checkFile(f){
   if(f.size > UP_MAX_MB*1024*1024) return `圖片超過 ${UP_MAX_MB}MB，請壓縮後再傳`;
   return null;
 }
+/* 上傳前壓縮：長邊 1600px、JPEG。整個請求要在 Vercel 的上限內（後端要求 3MB 以下），
+   超過時 Vercel 在請求到後端之前就擋掉，錯誤訊息看不出原因。回傳 data URL。 */
+var UP_SEND_MAX = 3*1024*1024;
+function shrinkImage(f){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(f), img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url);
+      const k=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+      const c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(img.naturalWidth*k)); c.height=Math.max(1,Math.round(img.naturalHeight*k));
+      const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(img,0,0,c.width,c.height);
+      for(const q of [0.8,0.65,0.5]){ const d=c.toDataURL("image/jpeg",q); if(d.length<UP_SEND_MAX) return res(d); }
+      rej(new Error("照片太大，請換一張或先裁切"));
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("這張照片無法讀取，請改用 JPG 或 PNG")); };
+    img.src=url;
+  });
+}
+const jpgName = n => n.replace(/\.[a-z0-9]+$/i,".jpg");
+
+/* 後端給的圖片是 15 分鐘就失效的簽名網址。圖片載入失敗時重拉購物車與許願換新網址，
+   一分鐘最多一次，避免壞圖一直觸發。 */
+var IMG_REFRESH={at:0,busy:false};
+function imgExpired(){
+  if(CFG.mock||IMG_REFRESH.busy||Date.now()-IMG_REFRESH.at<60000) return;
+  IMG_REFRESH.busy=true; IMG_REFRESH.at=Date.now();
+  Promise.all([req("/cart/list"),req("/wishes/list")]).then(([cart,wishes])=>{
+    (cart||[]).forEach(c=>{ const l=S.cart.find(x=>x.cid===c.cart_id); if(l&&c.image_url) l.img=c.image_url; });
+    (wishes||[]).forEach(w=>{ const x=DB.wishes.find(y=>y.id===w.wish_id); if(x&&w.picture) x.img=w.picture; });
+    render();
+  }).catch(()=>{}).finally(()=>{ IMG_REFRESH.busy=false; });
+}
+
 /* 上傳資訊卡（顯示原始檔名 → 系統檔名 → 存放位置） */
 function upInfo(kind,f,name){
   const u=UPLOAD[kind];
@@ -467,7 +500,7 @@ var PAYWAY = {
 var INV_ST = { pending:{t:"待開立",c:"grey"}, issued:{t:"已開立",c:"pine"},
                void:{t:"已作廢",c:"beni"}, allowance:{t:"已折讓",c:"gold"} };
 
-var SHOP = { name:"HEEEHABABY", bankName:"華南銀行", bankCode:"008",
+var SHOP = { name:"HEEEHABABY", bankName:"華南銀行", bankCode:"008", bankHolder:"",
              bankAccount:"000000000000", payDeadlineDays:2 };
 var FX = { cvs:70, home:120 };
 
@@ -481,7 +514,7 @@ var CFG = {
   mock   : false,       // true = 示範模式（本機假資料，不連後端）
   timeout: 12000,       // 單次請求逾時（ms）
   pollMs : 4000,        // 拍照辨識完成後的輪詢間隔（後端無推播管線，改由前台輪詢 /cart/list）
-  pollMax: 15,          // 最多輪詢次數（約 1 分鐘）
+  pollMax: 40,          // 最多輪詢次數（約 2.5 分鐘；n8n 每分鐘才領一次工作）
   retry  : 2            // 僅對網路錯誤與 5xx 重試
 };
 var AUTH = { idToken:null, ready:false };
@@ -584,7 +617,7 @@ var M={
   cart:(c)=>{ const src=c.source==="reorder"?"text":c.source;
     return {k:"S"+c.cart_id,cid:c.cart_id,src,ref:src==="broadcast"?c.ref:(c.ref||c.cart_id),n:c.name,nja:c.name_ja||"",
       e:ICON[c.source]||"🛍️",p:c.price_twd,jpy:c.jpy_taxed,q:c.qty,max:99,conf:c.ai_confidence||"high",
-      st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null}; },
+      st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done}; },
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
     quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null}),
@@ -685,10 +718,14 @@ function pollOcr(cid,line){
       const list=await API.cartList();
       const c=(list||[]).find(x=>x.cart_id===cid);
       if(!c){ stopPoll(cid); return; }             // 已被移除或已下單
-      if(c.price_twd!=null||c.ai_confidence!=="low"){
+      // 後端的 ocr_done 才是準的：辨識失敗時價格是 null、信心度是 low，但已經結束了。
+      // 舊後端沒有這個欄位時才退回舊判定。
+      const done = c.ocr_done!=null ? c.ocr_done===true : (c.price_twd!=null||c.ai_confidence!=="low");
+      if(done){
         const l=S.cart.find(x=>x.cid===cid);
         if(l){ const m=M.cart(c); Object.assign(l,m,{k:l.k,img:l.img||m.img}); }
-        stopPoll(cid); render(); toast("辨識完成，請確認商品與價格",2600);
+        stopPoll(cid); render();
+        toast(c.price_twd!=null?"辨識完成，請確認商品與價格":"無法辨識金額，請自行填寫名稱與價格",2600);
         return;
       }
     }catch(e){ /* 單次失敗不中斷，下一輪再試 */ }
@@ -721,6 +758,9 @@ async function initLiff(){
     ENV.os=liff.getOS(); ENV.ver=liff.getVersion(); ENV.lang=liff.getLanguage();
     if(!liff.isLoggedIn()){ liff.login({redirectUri:location.href}); return false; }
     AUTH.idToken=liff.getIDToken();
+    if(!AUTH.idToken){                              // LIFF 沒開 openid 權限時會是 null，之後每支 API 都 401
+      toast("LINE 登入資訊不完整，請稍後再試或聯絡官方客服",3200); loadFailed(); return false;
+    }
     AUTH.ready=true; ENV.ready=true;
     routeDeepLink();
     return true;
@@ -791,10 +831,12 @@ async function boot(){
       const [home,me,cart,wishes,orders,st]=await Promise.all([
         API.home(),API.profile(),API.cartList(),API.wishList(),API.orderList(),API.stmtList()]);
       M.me(me);
-      TRIP=M.batch(home.batch);
+      TRIP=home.batch?M.batch(home.batch):{code:"",name:"目前沒有開放中的團",region:"下一團開放時會在聊天室通知",
+        closeAt:new Date(0),buyAt:"—",backAt:"—",shipAt:"—",joined:0,orders:0,stage:0};
+      if(home.shop.ship_fee) Object.assign(FX,home.shop.ship_fee);   // 運費以後台設定為準
       PRICE_TABLE=home.price_table.map(r=>[r.jpy_taxed_max,r.twd]);
       Object.assign(SHOP,{name:home.shop.name,bankName:home.shop.bank_name,bankCode:home.shop.bank_code,
-        bankAccount:home.shop.bank_account,payDeadlineDays:home.shop.payment_deadline_days});
+        bankAccount:home.shop.bank_account,bankHolder:home.shop.bank_holder||"",payDeadlineDays:home.shop.payment_deadline_days});
       DB.broadcast=home.broadcast.map(M.bc);
       DB.me.waitlist=home.broadcast.filter(b=>b.waitlisted).map(b=>b.send_id);
       S.cart=cart.map(M.cart);
@@ -1253,6 +1295,7 @@ function reviewOrder(){
 function checkout(){
   const C=S.cart.filter(l=>l.st!=="pending");
   if(!C.length)return;
+  if(!CFG.mock) return checkoutLive(C);
   const ship=S.pick==="cvs"?FX.cvs:FX.home, sub=C.reduce((a,l)=>a+(l.p||0)*l.q,0), d=new Date(); DB.seq++;
   const o={id:`ORD-2609${pad(d.getDate())}-${pad(DB.seq)}`,
     trip:TRIP.name,date:`${d.getMonth()+1}/${pad(d.getDate())}`,st:0,pay:"待付款",
@@ -1272,6 +1315,27 @@ function checkout(){
   closeSheet(); syncBadge(); go("orders");
   toast(`訂單 ${o.id} 已送出，小幫手確認後計入對帳單`,2800);
   echoToChat(`🧾 已送出訂單 ${o.id}　共 ${o.items.length} 項　NT$${nf(o.total)}`);
+}
+
+/* 正式模式結帳：等後端成立訂單才顯示，單號、金額與運費都以後端為準，
+   不先放一張本機編號的假單（那個編號還會被傳進 LINE 聊天室）。 */
+var CHECKING_OUT=false;
+async function checkoutLive(C){
+  if(CHECKING_OUT) return;
+  if(C.some(l=>!l.cid)){ toast("購物車還在同步，請稍候再送出"); return; }
+  CHECKING_OUT=true;
+  try{
+    const r=await API.checkout({cart_ids:C.map(l=>l.cid),pickup:{type:S.pick},
+      invoice:{type:S.inv,carrier:DB.me.carrier,tax_id:S.taxId},note:S.note});
+    const o=M.order(r);
+    DB.orders.unshift(o);
+    S.cart=S.cart.filter(l=>C.indexOf(l)<0); S.note="";
+    S.open.add(o.id); S.oFilter="live";
+    closeSheet(); syncBadge(); go("orders");
+    toast(`訂單 ${o.id} 已送出，小幫手確認後計入對帳單`,2800);
+    echoToChat(`🧾 已送出訂單 ${o.id}　共 ${o.items.length} 項　NT$${nf(o.total)}`);
+  }catch(e){ /* call() 已提示原因，購物車保持原樣 */ }
+  finally{ CHECKING_OUT=false; }
 }
 
 /* ---------- 訂單 ---------- */
@@ -1342,11 +1406,11 @@ function wishForm(kind,pre){
     <p class="tiny dim" style="line-height:1.7">送出後會先辨識商品，再由日本現場的小幫手確認供貨與價格。許願不等於保留名額。</p>`,
    `<button class="btn primary block" onclick="submitWish('${kind}')">送出許願</button>`);
 }
-var _wishFile=null;
+var _wishFile=null, _wishRaw=null;
 function wishPhoto(ev){
   const f=ev.target.files&&ev.target.files[0];if(!f)return;
   const err=checkFile(f); if(err){ toast(err); ev.target.value=""; return; }
-  _wishFile=sysName("wish",f);
+  _wishFile=sysName("wish",f); _wishRaw=f;
   const r=new FileReader();
   r.onload=e=>{_wishImg=e.target.result;
     $("#wpv").innerHTML=`<div class="row" style="margin-top:12px">
@@ -1366,11 +1430,18 @@ async function submitWish(kind){
     title:kind==="link"?"辨識中的商品連結":kind==="text"?src.slice(0,28):"辨識中的商品照片",
     raw:src,note,qty:q,st:"parsing",at:now().split(" ")[0],img:kind==="photo"?_wishImg:null,
     file:kind==="photo"?_wishFile:null};
-  DB.wishes.unshift(w);_wishImg=null;_wishFile=null;closeSheet();go("wish");toast("許願已送出，辨識中…");
+  let data=kind==="photo"?w.img:undefined;
+  if(kind==="photo"&&!CFG.mock){
+    try{ data=await shrinkImage(_wishRaw); w.file=jpgName(w.file); }
+    catch(e){ toast(e.message); return; }
+  }
+  DB.wishes.unshift(w);_wishImg=null;_wishFile=null;_wishRaw=null;closeSheet();go("wish");
+  toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後會通知你");
   API.wishCreate({src:kind,item_name:kind==="text"?src:undefined,ref_url:kind==="link"?src:undefined,
-      quantity:q,note,file_name:w.file,data:kind==="photo"?w.img:undefined})
+      quantity:q,note,file_name:w.file,data})
     .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock) w.title=r.item_name; } })
     .catch(()=>{ DB.wishes=DB.wishes.filter(x=>x!==w); render(); });
+  if(!CFG.mock) return;                             // 正式模式由店家在後台報價，不模擬
   await wait(4000);
   const guess=["日本限定 貝親 寬口奶瓶配件組","西松屋 純棉包巾 兩入","和光堂 嬰兒米精 袋裝","Richell 吸管訓練杯 200ml"];
   w.title=kind==="text"?src:guess[Math.floor(Math.random()*guess.length)];
@@ -1604,6 +1675,7 @@ async function onOrderPhoto(ev){
       <div style="flex:1;min-width:0">
         <div class="tiny" id="ocrmsg"><span class="spin"></span> 上傳中…</div></div></div>
       ${upInfo("image",f,name)}`;
+    if(!CFG.mock) return uploadOrderPhoto(f,name);
     await wait(700);
     $("#ocrmsg").innerHTML=`<span class="spin"></span> 辨識商品中…`;
     await wait(1800);
@@ -1621,7 +1693,7 @@ async function onOrderPhoto(ev){
     API.cartAddImage({file_name:name,orig_name:f.name,mime:f.type,data:e.target.result})
       .then(r=>{ if(r&&r.cart_id){ imgLine.cid=r.cart_id;
         if(!CFG.mock){ Object.assign(imgLine,{n:r.name,nja:r.name_ja||"",jpy:r.jpy_taxed,p:r.price_twd,conf:r.ai_confidence,note:r.note||""});
-          if(r.price_twd==null) pollOcr(r.cart_id,imgLine); }
+          if(r.ocr_done===false||(r.ocr_done==null&&r.price_twd==null)) pollOcr(r.cart_id,imgLine); }
         render(); } })
       .catch(()=>{ S.cart=S.cart.filter(x=>x!==imgLine); syncBadge(); render(); });
     const m2=$("#ocrmsg"); if(m2) m2.innerHTML=`<span style="color:var(--pine);font-weight:700">✓ 辨識完成</span>`;
@@ -1629,6 +1701,24 @@ async function onOrderPhoto(ev){
     toast(g[3]==="high"?"已辨識，請確認後送出":"辨識信心不高，請檢查內容",2600);
   };
   r.readAsDataURL(f);
+}
+
+/* 正式模式的拍照下單：壓縮 → 上傳 → 放進購物車，辨識由後端做，前台輪詢結果。
+   不顯示任何猜測的品名或價格。 */
+async function uploadOrderPhoto(f,name){
+  const msg=t=>{ const m=$("#ocrmsg"); if(m) m.innerHTML=t; };
+  let data;
+  try{ data=await shrinkImage(f); }
+  catch(e){ msg(`<span style="color:var(--beni)">${esc(e.message)}</span>`); return; }
+  try{
+    const r=await API.cartAddImage({file_name:jpgName(name),orig_name:f.name,mime:"image/jpeg",data});
+    const l=M.cart(r); if(!l.img) l.img=data;
+    S.cart.push(l); syncBadge(true);
+    const waiting = r.ocr_done===false || (r.ocr_done==null&&r.price_twd==null);
+    if(waiting) pollOcr(r.cart_id,l);
+    closeSheet(); go("cart");
+    toast(waiting?"照片已送出，辨識約需 1–2 分鐘，完成會自動更新":"已辨識，請確認後送出",2800);
+  }catch(e){ msg(`<span style="color:var(--beni)">上傳失敗，請再試一次</span>`); }
 }
 
 /* ---------- 文字下單（text） ---------- */
@@ -1747,7 +1837,7 @@ function cartLine(l){
   const c=SRC[l.src], cf=l.conf?CONF[l.conf]:null;
   return `<div class="item" style="background:var(--surface);border:1px solid var(--line-soft);border-radius:13px;margin-bottom:9px">
     <div class="ph ${l.img?"zoomable":""}" ${l.img?`onclick="lightbox('img','${jsq(l.img)}','${jsq(l.n)}')"`:""}>
-      ${l.img?`<img src="${l.img}">`:l.e}</div>
+      ${l.img?`<img src="${l.img}" onerror="imgExpired()">`:l.e}</div>
     <div class="info">
       <div class="row" style="gap:6px;margin-bottom:3px">
         <span class="pill ${c.c}" style="padding:1px 7px;font-size:10.5px">${c.e} ${c.t}</span>
@@ -1813,7 +1903,7 @@ function vWish(){
     ${DB.wishes.length?DB.wishes.map(w=>{const s=WST[w.st];
       return `<div class="wish">
         <div class="row" style="align-items:flex-start">
-          ${w.img?`<img class="pv zoomable" src="${w.img}" alt="" onclick="lightbox('img','${jsq(w.img)}','${jsq(w.title)}')">`:""}
+          ${w.img?`<img class="pv zoomable" src="${w.img}" alt="" onerror="imgExpired()" onclick="lightbox('img','${jsq(w.img)}','${jsq(w.title)}')">`:""}
           <div style="flex:1;min-width:0">
             <div class="oid">${w.id}・${w.src}提交・${w.at}</div>
             <b style="font-size:14px;font-weight:700;line-height:1.45;display:block;margin-top:2px">
@@ -1942,6 +2032,14 @@ function splitAsk(oid){
 }
 function doSplit(oid){
   const o=DB.orders.find(x=>x.id===oid);
+  if(!CFG.mock){                                   // 子單與追蹤號碼由後端安排，不在前台編
+    closeSheet();
+    API.splitRequest(oid,true).then(async()=>{
+      o.split_shipped=true; render(); toast("已送出先出貨申請，小幫手會收到通知",2600);
+      try{ DB.orders=(await API.orderList()).map(M.order); render(); }catch(_){}
+    }).catch(()=>{});
+    return;
+  }
   const arr=o.items.filter(i=>i.ist==="已到貨"), pen=o.items.filter(i=>i.ist!=="已到貨");
   o.split_shipped=true;
   o.splits=[
@@ -2048,13 +2146,13 @@ async function doPay(sid){
         ${SHOP.bankAccount?`${SHOP.bankName}（${SHOP.bankCode}）　<span class="code">${SHOP.bankAccount}</span>
         <button class="link" style="margin-left:6px" onclick="copyText('${jsq(SHOP.bankAccount)}','帳號')">複製</button><br>`
         :`<b>匯款帳號暫時無法顯示</b>，請改用信用卡或 ATM，或從「我的 → 轉接客服」向小幫手索取。<br>`}
-        戶名 周○芳・金額 NT$${nf(t.total)}</div>
+        ${SHOP.bankHolder?`戶名 ${esc(SHOP.bankHolder)}・`:""}金額 NT$${nf(t.total)}</div>
       <div class="field" style="margin-top:12px"><label>轉出帳號後五碼</label>
         <input id="l5" maxlength="5" inputmode="numeric" placeholder="例如 31007"></div>
       <button class="btn primary block" onclick="submitFive('${sid}')">送出後五碼</button>
-      <label class="drop" style="display:block;cursor:pointer;margin-top:10px">
+      ${CFG.mock?`<label class="drop" style="display:block;cursor:pointer;margin-top:10px">
         <b>或上傳轉帳截圖</b><div class="tiny dim">系統自動辨識金額與後五碼</div>
-        <input type="file" accept="image/*" style="display:none" onchange="onStmtFile(event,'${sid}')"></label>`;
+        <input type="file" accept="image/*" style="display:none" onchange="onStmtFile(event,'${sid}')"></label>`:""}`;
     return;
   }
   if(w==="atm"){
