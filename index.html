@@ -342,6 +342,26 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
   details.order{transition:border-color .15s}
   details.order:hover{border-color:var(--line)}
 }
+/* 歡迎頁（LINE 以外的瀏覽器、還沒登入時）與載入畫面 */
+body.guest .tabs,body.guest .topbar .iconbtn{display:none!important}
+.welcome{max-width:440px;margin:0 auto;padding:34px 18px 44px;text-align:center}
+.welcome .mark{font-weight:900;letter-spacing:.14em;color:var(--pine);font-size:13px}
+.welcome h1{font-size:23px;line-height:1.45;margin:10px 0 10px;color:var(--ink);text-wrap:balance}
+.welcome .lead{color:var(--ink-2);font-size:14px;line-height:1.85;margin:0}
+.feat{display:grid;gap:10px;margin:26px 0 24px;text-align:left}
+.feat>div{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:13px 14px}
+.feat .e{font-size:22px;line-height:1.2}
+.feat b{display:block;font-size:14.5px;color:var(--ink)}
+.feat span{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.65;margin-top:2px}
+.btn-line{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;background:#06C755;color:#fff;border:0;border-radius:12px;
+  padding:14px 16px;font:inherit;font-size:15.5px;font-weight:700;cursor:pointer}
+.btn-line:hover{background:#05B34C}.btn-line:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
+.privacy{font-size:12px;color:var(--ink-3);line-height:1.75;margin:12px 4px 0}
+.welcome .oa{margin-top:22px;font-size:13px;color:var(--ink-2)}
+.welcome .oa a{color:var(--pine);font-weight:700;text-decoration:none}
+.splash{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--ink-3);font-size:13px}
+.splash .mark{font-weight:900;letter-spacing:.14em;color:var(--pine);font-size:15px}
+.splash .spin{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -665,6 +685,36 @@ async function mockApi(path,method,body){
 }
 function mockInvoice(){ return {st:"issued",no:"AB-"+Math.floor(1e7+Math.random()*9e7),date:now(),carrier:DB.me.carrier}; }
 
+/* 開機時先有畫面：LINE 登入與載入資料要一兩秒，不要讓客人對著空白頁 */
+function splash(){
+  const el=$("#view"); if(!el) return;
+  el.innerHTML=`<div class="splash"><div class="mark">HEEEHABABY</div><span class="spin"></span><div>載入中…</div></div>`;
+}
+/* 歡迎頁：只會在 LINE 以外的瀏覽器、而且還沒登入時出現。
+   在 LINE 裡打開會直接登入，客人不會看到這一頁。
+   由客人自己按「使用 LINE 帳號登入」才跳轉，不要一打開就被帶去 LINE。 */
+var OA_URL="https://line.me/R/ti/p/@378mwpde";
+function landing(){
+  const el=$("#view"); if(!el) return;
+  document.body.classList.add("guest");
+  el.innerHTML=`<div class="welcome">
+    <h1>日本嬰幼兒用品<br>現場代購</h1>
+    <p class="lead">日本實體店面現場採買，<br>在 LINE 就能跟團、下單、付款。</p>
+    <div class="feat">
+      <div><span class="e">📣</span><div><b>跟團喊單</b><span>現場連線開賣，喊單即保留，數量不超賣</span></div></div>
+      <div><span class="e">📷</span><div><b>拍照下單</b><span>拍下商品或價格標籤，自動辨識品名與價格</span></div></div>
+      <div><span class="e">🧾</span><div><b>半月結帳</b><span>每月 1 日、16 日一張對帳單，信用卡、ATM、轉帳都可以</span></div></div>
+    </div>
+    <button class="btn-line" onclick="startLogin()">使用 LINE 帳號登入</button>
+    <p class="privacy">登入只會取得你的 LINE 名稱與大頭貼，用來辨識你的訂單；<br>不會取得手機號碼、Email，也不會代你發訊息。</p>
+    <p class="oa">還沒加入官方帳號？<a href="${OA_URL}" target="_blank" rel="noopener">加入 LINE 好友</a></p>
+  </div>`;
+}
+function startLogin(){
+  try{ liff.login({redirectUri:cleanHref()}); }
+  catch(e){ toast("無法開啟 LINE 登入，請稍後再試",2800); }
+}
+
 /* 後端整個不通時的畫面：與其讓客人看到一堆錯誤，不如講清楚 */
 function maintenance(){
   const el=$("#view"); if(!el) return;
@@ -755,7 +805,11 @@ async function initLiff(){
     ENV.sdk=true;
     ENV.inClient=liff.isInClient();
     ENV.os=liff.getOS(); ENV.ver=liff.getVersion(); ENV.lang=liff.getLanguage();
-    if(!liff.isLoggedIn()){ liff.login({redirectUri:cleanHref()}); return false; }
+    if(!liff.isLoggedIn()){
+      // LINE 裡面一定已登入；外部瀏覽器先給歡迎頁，由客人自己按登入
+      if(ENV.inClient) liff.login({redirectUri:cleanHref()}); else landing();
+      return false;
+    }
     AUTH.idToken=liff.getIDToken();
     if(!AUTH.idToken){                              // LIFF 沒開 openid 權限時會是 null，之後每支 API 都 401
       toast("LINE 登入資訊不完整，請稍後再試或聯絡官方客服",3200); loadFailed(); return false;
@@ -838,6 +892,7 @@ function closeApp(){
 }
 /* 開機：登入 → 取資料 → 首次渲染 */
 async function boot(){
+  if(!CFG.mock) splash();
   const okAuth=await initLiff(); if(!okAuth) return;
   try{
     if(!CFG.mock){
@@ -868,6 +923,7 @@ async function boot(){
     }
   }
   try{ sessionStorage.removeItem("relogin"); }catch(_){}
+  document.body.classList.remove("guest");
   const nav=$(".tabs"); if(nav) nav.style.display="";   // 從維護或載入失敗畫面恢復
   render();
 }
