@@ -342,6 +342,26 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
   details.order{transition:border-color .15s}
   details.order:hover{border-color:var(--line)}
 }
+/* 歡迎頁（LINE 以外的瀏覽器、還沒登入時）與載入畫面 */
+body.guest .tabs,body.guest .topbar .iconbtn{display:none!important}
+.welcome{max-width:440px;margin:0 auto;padding:34px 18px 44px;text-align:center}
+.welcome .mark{font-weight:900;letter-spacing:.14em;color:var(--pine);font-size:13px}
+.welcome h1{font-size:23px;line-height:1.45;margin:10px 0 10px;color:var(--ink);text-wrap:balance}
+.welcome .lead{color:var(--ink-2);font-size:14px;line-height:1.85;margin:0}
+.feat{display:grid;gap:10px;margin:26px 0 24px;text-align:left}
+.feat>div{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line-soft);border-radius:14px;padding:13px 14px}
+.feat .e{font-size:22px;line-height:1.2}
+.feat b{display:block;font-size:14.5px;color:var(--ink)}
+.feat span{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.65;margin-top:2px}
+.btn-line{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;background:#06C755;color:#fff;border:0;border-radius:12px;
+  padding:14px 16px;font:inherit;font-size:15.5px;font-weight:700;cursor:pointer}
+.btn-line:hover{background:#05B34C}.btn-line:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
+.privacy{font-size:12px;color:var(--ink-3);line-height:1.75;margin:12px 4px 0}
+.welcome .oa{margin-top:22px;font-size:13px;color:var(--ink-2)}
+.welcome .oa a{color:var(--pine);font-weight:700;text-decoration:none}
+.splash{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--ink-3);font-size:13px}
+.splash .mark{font-weight:900;letter-spacing:.14em;color:var(--pine);font-size:15px}
+.splash .spin{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -479,12 +499,11 @@ function imgExpired(){
   }).catch(()=>{}).finally(()=>{ IMG_REFRESH.busy=false; });
 }
 
-/* 上傳資訊卡（顯示原始檔名 → 系統檔名 → 存放位置） */
+/* 上傳資訊卡（原始檔名、存放位置、大小）。系統檔名含會員識別碼，不給客人看 */
 function upInfo(kind,f,name){
   const u=UPLOAD[kind];
   return `<div class="upmeta">
     <div class="between"><span class="dim">原始檔名</span><span class="ell">${esc(f.name)}</span></div>
-    <div class="between"><span class="dim">系統檔名</span><span class="code ell">${esc(name)}</span></div>
     <div class="between"><span class="dim">存放位置</span><span>${u.label}</span></div>
     <div class="between"><span class="dim">檔案大小</span><span>${(f.size/1024).toFixed(0)} KB</span></div>
   </div>`;
@@ -633,7 +652,7 @@ var M={
     at:fmtTs(t.created_at),paidAt:fmtTs(t.paid_at),payway:t.payway,
     inv:t.invoice_no?{st:"issued",no:t.invoice_no,date:fmtTs(t.invoice_at),carrier:DB.me.carrier,amount:t.total_amount}:null,
     vacc:t.v_account||null,vaccBank:t.v_bank||null,vaccDue:t.v_expire_at?fmtDue(t.v_expire_at):null}),
-  me:(m)=>Object.assign(DB.me,{userId:m.line_user_id,name:m.display_name||m.nickname,nickname:m.nickname,
+  me:(m)=>Object.assign(DB.me,{userId:m.line_user_id,memberNo:m.member_no||"",name:m.display_name||m.nickname,nickname:m.nickname,
     joined:fmtDate(m.created_at),status:m.status,lastBind:fmtTs(m.bound_at),phone:m.phone||"",
     pickup:m.cvs_store_name?`${m.cvs_brand||""} ${m.cvs_store_name}`.trim():DB.me.pickup,pickupAddr:m.cvs_addr||"",
     pickupId:m.cvs_store_id||"",addr:m.home_addr||"",carrier:m.carrier||"",drops:m.shout_drops||0})
@@ -666,6 +685,36 @@ async function mockApi(path,method,body){
 }
 function mockInvoice(){ return {st:"issued",no:"AB-"+Math.floor(1e7+Math.random()*9e7),date:now(),carrier:DB.me.carrier}; }
 
+/* 開機時先有畫面：LINE 登入與載入資料要一兩秒，不要讓客人對著空白頁 */
+function splash(){
+  const el=$("#view"); if(!el) return;
+  el.innerHTML=`<div class="splash"><div class="mark">HEEEHABABY</div><span class="spin"></span><div>載入中…</div></div>`;
+}
+/* 歡迎頁：只會在 LINE 以外的瀏覽器、而且還沒登入時出現。
+   在 LINE 裡打開會直接登入，客人不會看到這一頁。
+   由客人自己按「使用 LINE 帳號登入」才跳轉，不要一打開就被帶去 LINE。 */
+var OA_URL="https://line.me/R/ti/p/@378mwpde";
+function landing(){
+  const el=$("#view"); if(!el) return;
+  document.body.classList.add("guest");
+  el.innerHTML=`<div class="welcome">
+    <h1>日本嬰幼兒用品<br>現場代購</h1>
+    <p class="lead">日本實體店面現場採買，<br>在 LINE 就能跟團、下單、付款。</p>
+    <div class="feat">
+      <div><span class="e">📣</span><div><b>跟團喊單</b><span>現場連線開賣，喊單即保留，數量不超賣</span></div></div>
+      <div><span class="e">📷</span><div><b>拍照下單</b><span>拍下商品或價格標籤，自動辨識品名與價格</span></div></div>
+      <div><span class="e">🧾</span><div><b>半月結帳</b><span>每月 1 日、16 日一張對帳單，信用卡、ATM、轉帳都可以</span></div></div>
+    </div>
+    <button class="btn-line" onclick="startLogin()">使用 LINE 帳號登入</button>
+    <p class="privacy">登入只會取得你的 LINE 名稱與大頭貼，用來辨識你的訂單；<br>不會取得手機號碼、Email，也不會代你發訊息。</p>
+    <p class="oa">還沒加入官方帳號？<a href="${OA_URL}" target="_blank" rel="noopener">加入 LINE 好友</a></p>
+  </div>`;
+}
+function startLogin(){
+  try{ liff.login({redirectUri:cleanHref()}); }
+  catch(e){ toast("無法開啟 LINE 登入，請稍後再試",2800); }
+}
+
 /* 後端整個不通時的畫面：與其讓客人看到一堆錯誤，不如講清楚 */
 function maintenance(){
   const el=$("#view"); if(!el) return;
@@ -683,7 +732,7 @@ function relogin(){
   try{
     if(sessionStorage.getItem("relogin")) return false;
     sessionStorage.setItem("relogin","1");
-    liff.logout(); liff.login({redirectUri:location.href}); return true;
+    liff.logout(); liff.login({redirectUri:cleanHref()}); return true;
   }catch(_){ return false; }
 }
 
@@ -756,19 +805,39 @@ async function initLiff(){
     ENV.sdk=true;
     ENV.inClient=liff.isInClient();
     ENV.os=liff.getOS(); ENV.ver=liff.getVersion(); ENV.lang=liff.getLanguage();
-    if(!liff.isLoggedIn()){ liff.login({redirectUri:location.href}); return false; }
+    if(!liff.isLoggedIn()){
+      // LINE 裡面一定已登入；外部瀏覽器先給歡迎頁，由客人自己按登入
+      if(ENV.inClient) liff.login({redirectUri:cleanHref()}); else landing();
+      return false;
+    }
     AUTH.idToken=liff.getIDToken();
     if(!AUTH.idToken){                              // LIFF 沒開 openid 權限時會是 null，之後每支 API 都 401
       toast("LINE 登入資訊不完整，請稍後再試或聯絡官方客服",3200); loadFailed(); return false;
     }
     AUTH.ready=true; ENV.ready=true;
     routeDeepLink();
+    cleanLoginParams();
     return true;
   }catch(e){
     toast("LINE 登入失敗："+(e&&e.message||"未知錯誤"),3200);
     return false;
   }
 }
+/* LINE 登入完成後，網址會帶回一次性的授權碼等參數（code、state…）。
+   授權碼已經被 LIFF 用掉、也只能用一次，但留在網址列上不好看，客人分享或截圖時也會一起帶出去，
+   所以登入完成後就拿掉，只保留 ?path= 這類自己的參數。 */
+var LOGIN_PARAMS=["code","state","friendship_status_changed","liffClientId","liffRedirectUri","liff.state","error","error_description"];
+function cleanHref(){
+  try{
+    const u=new URL(location.href);
+    LOGIN_PARAMS.forEach(k=>u.searchParams.delete(k));
+    return u.origin+u.pathname+(u.searchParams.toString()?"?"+u.searchParams.toString():"")+u.hash;
+  }catch(_){ return location.origin+location.pathname; }
+}
+function cleanLoginParams(){
+  try{ const c=cleanHref(); if(c!==location.href) history.replaceState(history.state,"",c); }catch(_){}
+}
+
 /* Deep Link：推播訊息可帶 ?path=orders 直接開到指定頁
    例：https://liff.line.me/{liffId}?path=orders&id=ORD-260901-014 */
 function routeDeepLink(){
@@ -784,19 +853,53 @@ function routeDeepLink(){
 
 /* ---- LINE 專屬能力（外部瀏覽器自動降級） ---- */
 
-/* 分享團次給朋友或群組 —— 客人自己幫忙推廣 */
+/* 分享團次給朋友或群組 —— 客人自己幫忙推廣
+   1. 有 LINE 分享（LINE 裡或外部瀏覽器都可以，要在 LIFF 設定打開 shareTargetPicker）：
+      跳出 LINE 的好友／群組選單，送出一張團次卡片，按鈕直接開前台。
+   2. 手機瀏覽器：用系統的分享選單（Web Share）。
+   3. 都不行才複製文字。 */
+function tripShareUrl(){ return "https://liff.line.me/"+CFG.liffId; }
+function tripFlex(){
+  const left=tripLeftTxt(), closed=left==="已截止";
+  return { type:"flex", altText:`【${TRIP.name}】現場採買中，一起跟團`,
+    contents:{ type:"bubble", size:"kilo",
+      header:{ type:"box", layout:"vertical", backgroundColor:"#15564F", paddingAll:"16px", contents:[
+        { type:"text", text:"HEEEHABABY 日本代購", size:"xs", color:"#CFE3DE", weight:"bold" },
+        { type:"text", text:TRIP.name||"本次採買行程", size:"lg", color:"#FFFFFF", weight:"bold", wrap:true, margin:"sm" },
+        { type:"text", text:(TRIP.region||"日本")+"・實體店面現場採買", size:"xs", color:"#CFE3DE", wrap:true, margin:"xs" } ] },
+      body:{ type:"box", layout:"vertical", spacing:"sm", paddingAll:"16px", contents:[
+        { type:"box", layout:"baseline", contents:[
+          { type:"text", text:"收單", size:"sm", color:"#8B9C93", flex:2 },
+          { type:"text", text:closed?"已截止":"剩 "+left, size:"sm", color:closed?"#8B9C93":"#A8123C", weight:"bold", flex:5 } ] },
+        { type:"box", layout:"baseline", contents:[
+          { type:"text", text:"採買", size:"sm", color:"#8B9C93", flex:2 },
+          { type:"text", text:TRIP.buyAt||"—", size:"sm", color:"#172A22", flex:5 } ] },
+        { type:"text", text:"拍照或打字就能下單，半月結帳一次付", size:"xs", color:"#4C5F56", wrap:true, margin:"md" } ] },
+      footer:{ type:"box", layout:"vertical", paddingAll:"12px", contents:[
+        { type:"button", style:"primary", color:"#06C755", height:"sm",
+          action:{ type:"uri", label:closed?"看看下一團":"我要跟團", uri:tripShareUrl() } } ] } } };
+}
 async function shareTrip(){
   const text=`【${TRIP.name}】${TRIP.region} 現場採買中\n收單剩 ${tripLeftTxt()}，一起跟團 👇`;
-  if(!can("shareTargetPicker")){
-    try{ await navigator.clipboard.writeText(text+"\n"+location.href);
-      toast("已複製團次資訊，可直接貼到聊天室",2600); }
-    catch(e){ toast("請在 LINE 內開啟才能分享",2600); }
+  let pick=false;
+  try{ pick = !CFG.mock && ENV.sdk && liff.isApiAvailable("shareTargetPicker"); }catch(_){}
+  if(pick){
+    try{
+      let r;
+      try{ r=await liff.shareTargetPicker([tripFlex()]); }
+      catch(e){ r=await liff.shareTargetPicker([{ type:"text", text:text+"\n"+tripShareUrl() }]); }   // 卡片被拒時退回純文字
+      toast(r?"已分享，謝謝你的推薦！":"已取消分享",2400);
+    }catch(e){ toast("分享失敗，請稍後再試"); }
     return;
   }
-  try{
-    const r=await liff.shareTargetPicker([{ type:"text", text:text+"\nhttps://liff.line.me/"+CFG.liffId }]);
-    toast(r?"已分享，謝謝你的推薦！":"已取消分享",2400);
-  }catch(e){ toast("分享失敗，請稍後再試"); }
+  if(navigator.share){
+    try{ await navigator.share({ title:TRIP.name, text, url:tripShareUrl() }); toast("已分享，謝謝你的推薦！",2400); }
+    catch(e){ if(e&&e.name!=="AbortError") toast("分享失敗，請稍後再試"); }
+    return;
+  }
+  try{ await navigator.clipboard.writeText(text+"\n"+tripShareUrl());
+    toast("已複製團次資訊，可直接貼到聊天室",2600); }
+  catch(e){ toast("請在 LINE 內開啟才能分享",2600); }
 }
 /* 把動作同步一則訊息到聊天室，留下可追溯的紀錄 */
 async function echoToChat(text){
@@ -823,6 +926,7 @@ function closeApp(){
 }
 /* 開機：登入 → 取資料 → 首次渲染 */
 async function boot(){
+  if(!CFG.mock) splash();
   const okAuth=await initLiff(); if(!okAuth) return;
   try{
     if(!CFG.mock){
@@ -853,6 +957,7 @@ async function boot(){
     }
   }
   try{ sessionStorage.removeItem("relogin"); }catch(_){}
+  document.body.classList.remove("guest");
   const nav=$(".tabs"); if(nav) nav.style.display="";   // 從維護或載入失敗畫面恢復
   render();
 }
@@ -985,7 +1090,7 @@ DB={
  recon:null,
  me:{
    /* 以下對應 customers 工作表 */
-   userId:"U0000000000000000000000000demo0001", name:"周",  nickname:"周周",
+   userId:"U0000000000000000000000000demo0001", memberNo:"HB-00023", name:"周",  nickname:"周周",
    joined:"2026-04-28", status:"已綁定", lastBind:"2026-05-05 22:38",
    /* 以下為前台新增欄位（目前資料庫尚無，需新增） */
    phone:"0900-000-000",
@@ -2286,7 +2391,7 @@ function vMe(){
     <div class="sumbox">
       <div class="sumrow"><span>LINE 綁定</span><span style="color:var(--pine);font-weight:700">${DB.me.status}</span></div>
       <div class="sumrow"><span>綁定時間</span><span>${DB.me.lastBind}</span></div>
-      <div class="sumrow"><span>會員編號</span><span class="code">${DB.me.userId.slice(0,10)}…</span></div>
+      ${DB.me.memberNo?`<div class="sumrow"><span>會員編號</span><span class="code">${esc(DB.me.memberNo)}</span></div>`:""}
     </div>
     <p class="tiny dim" style="text-align:center;margin:18px 0 8px;line-height:1.8">
       HEEEHABABY 日本代購</p></div>`;
