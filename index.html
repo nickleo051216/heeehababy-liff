@@ -479,12 +479,11 @@ function imgExpired(){
   }).catch(()=>{}).finally(()=>{ IMG_REFRESH.busy=false; });
 }
 
-/* 上傳資訊卡（顯示原始檔名 → 系統檔名 → 存放位置） */
+/* 上傳資訊卡（原始檔名、存放位置、大小）。系統檔名含會員識別碼，不給客人看 */
 function upInfo(kind,f,name){
   const u=UPLOAD[kind];
   return `<div class="upmeta">
     <div class="between"><span class="dim">原始檔名</span><span class="ell">${esc(f.name)}</span></div>
-    <div class="between"><span class="dim">系統檔名</span><span class="code ell">${esc(name)}</span></div>
     <div class="between"><span class="dim">存放位置</span><span>${u.label}</span></div>
     <div class="between"><span class="dim">檔案大小</span><span>${(f.size/1024).toFixed(0)} KB</span></div>
   </div>`;
@@ -633,7 +632,7 @@ var M={
     at:fmtTs(t.created_at),paidAt:fmtTs(t.paid_at),payway:t.payway,
     inv:t.invoice_no?{st:"issued",no:t.invoice_no,date:fmtTs(t.invoice_at),carrier:DB.me.carrier,amount:t.total_amount}:null,
     vacc:t.v_account||null,vaccBank:t.v_bank||null,vaccDue:t.v_expire_at?fmtDue(t.v_expire_at):null}),
-  me:(m)=>Object.assign(DB.me,{userId:m.line_user_id,name:m.display_name||m.nickname,nickname:m.nickname,
+  me:(m)=>Object.assign(DB.me,{userId:m.line_user_id,memberNo:m.member_no||"",name:m.display_name||m.nickname,nickname:m.nickname,
     joined:fmtDate(m.created_at),status:m.status,lastBind:fmtTs(m.bound_at),phone:m.phone||"",
     pickup:m.cvs_store_name?`${m.cvs_brand||""} ${m.cvs_store_name}`.trim():DB.me.pickup,pickupAddr:m.cvs_addr||"",
     pickupId:m.cvs_store_id||"",addr:m.home_addr||"",carrier:m.carrier||"",drops:m.shout_drops||0})
@@ -985,7 +984,7 @@ DB={
  recon:null,
  me:{
    /* 以下對應 customers 工作表 */
-   userId:"U0000000000000000000000000demo0001", name:"周",  nickname:"周周",
+   userId:"U0000000000000000000000000demo0001", memberNo:"HB-00023", name:"周",  nickname:"周周",
    joined:"2026-04-28", status:"已綁定", lastBind:"2026-05-05 22:38",
    /* 以下為前台新增欄位（目前資料庫尚無，需新增） */
    phone:"0900-000-000",
@@ -2286,7 +2285,7 @@ function vMe(){
     <div class="sumbox">
       <div class="sumrow"><span>LINE 綁定</span><span style="color:var(--pine);font-weight:700">${DB.me.status}</span></div>
       <div class="sumrow"><span>綁定時間</span><span>${DB.me.lastBind}</span></div>
-      <div class="sumrow"><span>會員編號</span><span class="code">${DB.me.userId.slice(0,10)}…</span></div>
+      ${DB.me.memberNo?`<div class="sumrow"><span>會員編號</span><span class="code">${esc(DB.me.memberNo)}</span></div>`:""}
     </div>
     <p class="tiny dim" style="text-align:center;margin:18px 0 8px;line-height:1.8">
       HEEEHABABY 日本代購</p></div>`;
