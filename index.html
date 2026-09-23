@@ -393,7 +393,7 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
    HEEEHABABY 買家前台（LINE LIFF）
    名詞與訂單狀態依系統規格：團 / 願望清單 / 拆單 / 狀態機
    ---------------------------------------------------------------------------
-   ★ 後端接點：見 japan-system 的 BUYER_API_CONTRACT.md（/api/v1/{resource}/{action}，26 個）
+   ★ 後端接點：見 japan-system 的 BUYER_API_CONTRACT.md（/api/v1/{resource}/{action}，27 個，含公開的 /health）
      前端不直連資料庫、不持有金鑰；身分一律送 LIFF ID token，由後端驗證。
      本前台獨立部署於 japan-front-end-system，/api/v1/* 由 vercel.json 反向代理到後端，
      瀏覽器看到的是同網域，不需要 CORS。
@@ -457,7 +457,7 @@ function upInfo(kind,f,name){
   </div>`;
 }
 
-/* 金流方式 —— 前端只送「選了哪一種」，所有金鑰與簽章都在 n8n，前端不持有 */
+/* 金流方式 —— 前端只送「選了哪一種」，所有金鑰與簽章都在後端，前端不持有 */
 var PAYWAY = {
   credit :{t:"信用卡",      e:"💳", d:"一次付清，刷卡後立即完成",       fee:"", flow:"redirect"},
   atm    :{t:"ATM 虛擬帳號", e:"🏧", d:"取得專屬帳號，臨櫃或網銀轉帳",   fee:"", flow:"vacc"},
@@ -472,13 +472,13 @@ var SHOP = { name:"HEEEHABABY", bankName:"華南銀行", bankCode:"008",
 var FX = { cvs:70, home:120 };
 
 /* =========================================================================
-   資料層 — 前端唯一對外出口。CFG.mock=true 走本機假資料，false 走 n8n。
+   資料層 — 前端唯一對外出口。CFG.mock=true 走本機假資料，false 走後端 japan-system（/api/v1）。
    身分一律送 LIFF idToken，前端不自行傳 userId。
    ========================================================================= */
 var CFG = {
   liffId : "2011699944-c5n725TF",
   base   : "/api/v1",   // 由 vercel.json rewrites 代理到後端 japan-system，瀏覽器視為同網域
-  mock   : true,        // ← 後端端點就緒後改成 false
+  mock   : false,       // true = 示範模式（本機假資料，不連後端）
   timeout: 12000,       // 單次請求逾時（ms）
   pollMs : 4000,        // 拍照辨識完成後的輪詢間隔（後端無推播管線，改由前台輪詢 /cart/list）
   pollMax: 15,          // 最多輪詢次數（約 1 分鐘）
@@ -644,6 +644,27 @@ function maintenance(){
   const nav=$(".tabs"); if(nav) nav.style.display="none";
 }
 
+/* LINE 登入憑證過期時重新登入一次；同一分頁只試一次，避免後端設定錯誤時無限跳轉 */
+function relogin(){
+  if(!ENV.sdk) return false;
+  try{
+    if(sessionStorage.getItem("relogin")) return false;
+    sessionStorage.setItem("relogin","1");
+    liff.logout(); liff.login({redirectUri:location.href}); return true;
+  }catch(_){ return false; }
+}
+
+/* 後端有回應、但資料載不完整時的畫面（例如登入逾時、單一端點出錯） */
+function loadFailed(){
+  const el=$("#view"); if(!el) return;
+  el.innerHTML=`<div class="wrap"><div class="empty" style="padding:70px 22px">
+    <div style="font-size:38px">📡</div>
+    <h3>資料載入失敗</h3>
+    <p>請稍後再試一次。若一直出現，請直接在 LINE 聊天室找小幫手。</p>
+    <button class="btn primary" style="margin-top:16px" onclick="boot()">重新載入</button></div></div>`;
+  const nav=$(".tabs"); if(nav) nav.style.display="none";
+}
+
 /* 拍照下單：後端辨識完成後不推播，由前台輪詢 /cart/list 取回結果 */
 var POLLS={};
 function stopPoll(cid){ if(POLLS[cid]){ clearTimeout(POLLS[cid].t); delete POLLS[cid]; } }
@@ -766,7 +787,7 @@ async function boot(){
   try{
     if(!CFG.mock){
       const h=await API.health().catch(()=>null);      // 後端不通就不用再打 6 支 API
-      if(h&&h.status==="down"){ maintenance(); return; }
+      if(!h||h.status==="down"){ maintenance(); return; }
       const [home,me,cart,wishes,orders,st]=await Promise.all([
         API.home(),API.profile(),API.cartList(),API.wishList(),API.orderList(),API.stmtList()]);
       M.me(me);
@@ -782,7 +803,15 @@ async function boot(){
       DB.orders=orders.map(M.order);
       DB.stmts=st.statements.map(M.stmt);
     }
-  }catch(e){ /* 已於 call() 提示，改用現有資料渲染 */ }
+  }catch(e){
+    /* 正式模式載不到資料時不能退回示範資料：客人會看到假的團次與訂單，還可能照著操作 */
+    if(!CFG.mock){
+      if(e&&e.code==="UNAUTHENTICATED"&&relogin()) return;
+      loadFailed(); return;
+    }
+  }
+  try{ sessionStorage.removeItem("relogin"); }catch(_){}
+  const nav=$(".tabs"); if(nav) nav.style.display="";   // 從維護或載入失敗畫面恢復
   render();
 }
 var wait = ms => new Promise(r=>setTimeout(r,ms));
