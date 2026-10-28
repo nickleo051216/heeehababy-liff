@@ -525,6 +525,9 @@ var PAYWAY = {
   atm    :{t:"ATM 虛擬帳號", e:"🏧", d:"取得專屬帳號，臨櫃或網銀轉帳",   fee:"", flow:"vacc"},
   bank   :{t:"銀行轉帳",     e:"🏦", d:"轉帳後回報後五碼，人工核對",     fee:"", flow:"manual"}
 };
+/* 目前開放的付款方式。ATM 虛擬帳號要由綠界配號，後端還沒串（合約待確認 #4），
+   正式模式先不顯示，免得客人選了才被改成轉帳；開通後拿掉這個條件即可 */
+function payways(){ return Object.entries(PAYWAY).filter(([k])=>CFG.mock||k!=="atm"); }
 /* 發票開立狀態 */
 var INV_ST = { pending:{t:"待開立",c:"grey"}, issued:{t:"已開立",c:"pine"},
                void:{t:"已作廢",c:"beni"}, allowance:{t:"已折讓",c:"gold"} };
@@ -720,7 +723,7 @@ function landing(){
     <div class="feat">
       <div><span class="e">📣</span><div><b>跟團喊單</b><span>現場連線開賣，喊單即保留，數量不超賣</span></div></div>
       <div><span class="e">📷</span><div><b>拍照下單</b><span>拍下商品或價格標籤，自動辨識品名與價格</span></div></div>
-      <div><span class="e">🧾</span><div><b>半月結帳</b><span>每月 15 日、月底各一張對帳單，信用卡、ATM、轉帳都可以</span></div></div>
+      <div><span class="e">🧾</span><div><b>半月結帳</b><span>每月 15 日、月底各一張對帳單，信用卡、轉帳都可以</span></div></div>
     </div>
     <button class="btn-line" onclick="startLogin()">使用 LINE 帳號登入</button>
     <p class="privacy">登入只會取得你的 LINE 名稱與大頭貼，用來辨識你的訂單；<br>不會取得手機號碼、Email，也不會代你發訊息。</p>
@@ -1276,7 +1279,7 @@ function doAck(no,n){
 function waitlist(no){
   const it=DB.broadcast.find(x=>x.no===no);
   const on=DB.me.waitlist.indexOf(no)<0;
-  if(on){DB.me.waitlist.push(no);toast(`${no} 已排候補，有人棄單會通知你`);}
+  if(on){DB.me.waitlist.push(no);toast(`${no} 已排候補，名額釋出時請留意 LINE 群組公告`);}
   else {DB.me.waitlist=DB.me.waitlist.filter(x=>x!==no);toast("已取消候補");}
   render();
   API.waitlist(no,on).catch(()=>{ DB.me.waitlist=on?DB.me.waitlist.filter(x=>x!==no):DB.me.waitlist.concat(no); render(); });
@@ -1525,7 +1528,7 @@ function tracking(oid,idx){
 var WST={parsing:{t:"解析中",c:"grey",d:"正在辨識商品，稍後由小幫手確認供貨"},
  quoted:{t:"已報價",c:"gold",d:"確認後即轉為訂單，名額於付款後保留"},
  nostock:{t:"現場缺貨",c:"beni",d:"本次現場未找到"},
- kept:{t:"保留下團",c:"pine",d:"下團開團時會主動通知你"},
+ kept:{t:"保留下團",c:"pine",d:"下團開團時會在 LINE 群組公告"},
  converted:{t:"已下單",c:"pine",d:"已轉為訂單"}};
 var _wishImg=null;
 function wishForm(kind,pre){
@@ -1573,7 +1576,7 @@ async function submitWish(kind){
     catch(e){ toast(e.message); return; }
   }
   DB.wishes.unshift(w);_wishImg=null;_wishFile=null;_wishRaw=null;closeSheet();go("wish");
-  toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後會通知你");
+  toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後可以在「許願」頁查看",2600);
   API.wishCreate({src:kind,item_name:kind==="text"?src:undefined,ref_url:kind==="link"?src:undefined,
       quantity:q,note,file_name:w.file,data})
     .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock) w.title=r.item_name; } })
@@ -1596,7 +1599,7 @@ function wishToCart(id){
     .catch(()=>{ S.cart=S.cart.filter(x=>x!==wl); w.st="quoted"; w.orderId=null; syncBadge(); render(); });
   toast("已加入購物車，可與其他商品一起結帳");}
 
-function wishKeep(id){const w=DB.wishes.find(x=>x.id===id),prev=w.st;w.st="kept";render();toast("已保留至下一團，開團時會通知你");
+function wishKeep(id){const w=DB.wishes.find(x=>x.id===id),prev=w.st;w.st="kept";render();toast("已保留至下一團，開團時會在 LINE 群組公告");
   API.wishKeep(id).catch(()=>{ w.st=prev; render(); });}
 function wishDrop(id){const w=DB.wishes.find(x=>x.id===id);DB.wishes=DB.wishes.filter(x=>x.id!==id);syncBadge();render();toast("已刪除此筆許願");
   API.wishRemove(id).catch(()=>{ DB.wishes.push(w); syncBadge(); render(); });}
@@ -1619,7 +1622,7 @@ function invoiceList(){
       使用手機條碼載具者可於財政部平台查詢與自動對獎，不另寄送紙本。<br>
       如需作廢或折讓，請聯繫小幫手。</p>`
     :`<div class="empty" style="padding:36px 10px"><div style="font-size:34px">🧾</div>
-      <h3>還沒有電子發票</h3><p>完成付款後會自動開立並顯示在這裡。</p></div>`);
+      <h3>還沒有電子發票</h3><p>付款完成、發票開立後會顯示在這裡。</p></div>`);
 }
 /* 登出只在 LINE 以外的瀏覽器有意義：LINE 裡的身分就是這支手機上的 LINE 帳號 */
 /* LINE 大頭貼與是否已加好友：拿不到就算了，不影響其他功能 */
@@ -1796,7 +1799,7 @@ function vHome(){
     <div class="h2">📣 現場連線喊單</div>
     <div class="sumbox" style="text-align:center;padding:20px">
       <div class="sm dim">目前沒有進行中的連線</div>
-      <div class="tiny dim" style="margin-top:4px">小幫手開播時會推播通知你</div></div>`}
+      <div class="tiny dim" style="margin-top:4px">小幫手開播時會在 LINE 群組公告</div></div>`}
 
     </div><div class="hg-side">
     <div class="h2">隨時都能下單</div>
@@ -2274,7 +2277,7 @@ function vStmt(){
   return `
     ${unbilled.length?`<div class="alert gold">
       <b>尚未結算 ${unbilled.length} 筆・NT$${nf(sum)}</b><br>
-      每月 15 日、月底結算，隔天凌晨會推播對帳單給你。</div>`:""}
+      每月 15 日、月底結算，結算後會推播對帳單給你。</div>`:""}
     ${DB.stmts.map(t=>`<div class="order" style="padding:14px;margin-top:11px">
       <div class="between">
         <div><div class="oid">${t.id}</div>
@@ -2304,8 +2307,8 @@ function vStmt(){
                <button class="link" style="margin-left:6px" onclick="copyText('${t.vacc}','繳費帳號')">複製</button><br>
                NT$${nf(t.total)}・${esc(t.vaccDue)}內完成</div>`
              :`<div class="alert pine" style="margin-top:10px">
-               支援信用卡、ATM 轉帳、LINE Pay、銀行轉帳<br>
-               付款成功後自動開立電子發票</div>`}
+               支援信用卡、銀行轉帳<br>
+               付款完成後開立電子發票</div>`}
            <button class="btn primary block" style="margin-top:10px" onclick="S._sid='${t.id}';payStmt('${t.id}')">
              ${t.vacc?"改用其他方式付款":"前往付款 NT$"+nf(t.total)}</button>`}
     </div>`).join("")}
@@ -2317,7 +2320,7 @@ function vStmt(){
 function payStmt(sid){
   S._sid=sid;
   const t=DB.stmts.find(x=>x.id===sid);
-  S.payway=S.payway||"credit";
+  if(!S.payway||!payways().some(([k])=>k===S.payway)) S.payway="credit";
   openSheet("付款　"+sid,`
     <div class="sumbox" style="margin-top:0">
       <div class="sumrow total" style="border-top:none;margin:0;padding:0">
@@ -2326,7 +2329,7 @@ function payStmt(sid){
       <div class="sumrow"><span>付款期限</span><span>收到後 ${SHOP.payDeadlineDays} 天內</span></div></div>
 
     <div class="h2" style="margin:18px 0 8px">選擇付款方式</div>
-    ${Object.entries(PAYWAY).map(([k,w])=>`
+    ${payways().map(([k,w])=>`
       <button class="payopt ${S.payway===k?"on":""}" onclick="setPayway('${k}')">
         <span class="pe">${w.e}</span>
         <span style="flex:1;text-align:left"><b>${w.t}</b><br><span class="tiny dim">${w.d}</span></span>
@@ -2336,7 +2339,7 @@ function payStmt(sid){
     <div class="sumbox">
       <div class="sumrow"><span>開立方式</span><span>${S.inv==="carrier"?"手機載具 "+esc(DB.me.carrier)
         :S.inv==="donate"?"捐贈發票":"統一編號 "+esc(S.taxId||"未填")}</span></div>
-      <div class="sumrow"><span>開立時機</span><span>付款成功後自動開立</span></div></div>
+      <div class="sumrow"><span>開立時機</span><span>付款完成後開立</span></div></div>
     <button class="link" style="margin-top:8px" onclick="closeSheet();go('cart')">要改發票設定，到購物車調整</button>
 
     <div id="payzone"></div>`,
@@ -2360,7 +2363,7 @@ async function doPay(sid){
       <div class="alert pine" style="margin-top:14px">
         ${SHOP.bankAccount?`${SHOP.bankName}（${SHOP.bankCode}）　<span class="code">${SHOP.bankAccount}</span>
         <button class="link" style="margin-left:6px" onclick="copyText('${jsq(SHOP.bankAccount)}','帳號')">複製</button><br>`
-        :`<b>匯款帳號暫時無法顯示</b>，請改用信用卡或 ATM，或從「我的 → 轉接客服」向小幫手索取。<br>`}
+        :`<b>匯款帳號暫時無法顯示</b>，請改用信用卡，或從「我的 → 轉接客服」向小幫手索取。<br>`}
         ${SHOP.bankHolder?`戶名 ${esc(SHOP.bankHolder)}・`:""}金額 NT$${nf(t.total)}</div>
       <div class="field" style="margin-top:12px"><label>轉出帳號後五碼</label>
         <input id="l5" maxlength="5" inputmode="numeric" placeholder="例如 31007"></div>
@@ -2406,7 +2409,7 @@ function submitFive(sid){
   if(!/^\d{5}$/.test(v)){ toast("請輸入 5 碼數字"); return; }
   const t=DB.stmts.find(x=>x.id===sid); const prev={pay:t.pay,last5:t.last5,payway:t.payway};
   t.last5=v; t.pay="待官方確認"; t.payway="bank";
-  closeSheet(); render(); toast("已回報，核對完成後會通知你",2600);
+  closeSheet(); render(); toast("已回報，核對完成後對帳單會顯示「已核對」",2600);
   API.reportTransfer(sid,v).catch(()=>{ Object.assign(t,prev); render(); });
 }
 function onStmtFile(ev,sid){
