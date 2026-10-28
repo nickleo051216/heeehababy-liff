@@ -1,5 +1,10 @@
 {
+  "redirects": [
+    { "source": "/admin", "destination": "/admin/", "permanent": false }
+  ],
   "rewrites": [
+    { "source": "/admin/", "destination": "https://japan-system-lilac.vercel.app/index.html" },
+    { "source": "/admin/:path*", "destination": "https://japan-system-lilac.vercel.app/:path*" },
     { "source": "/api/v1/:path*", "destination": "https://japan-system-lilac.vercel.app/api/v1/:path*" }
   ],
   "headers": [
