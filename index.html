@@ -532,6 +532,11 @@ var INV_ST = { pending:{t:"待開立",c:"grey"}, issued:{t:"已開立",c:"pine"}
 var SHOP = { name:"HEEEHABABY", bankName:"華南銀行", bankCode:"008", bankHolder:"",
              bankAccount:"000000000000", payDeadlineDays:2 };
 var FX = { cvs:70, home:120 };
+/* 滿額免運門檻（台幣），null = 這種取貨方式沒有免運。看單張訂單的商品小計（不含運費），
+   還沒定價的品項以 0 計；實收運費以結帳回傳的 ship_fee_twd 為準（合約 v1.3） */
+var SHIP_FREE = { cvs:null, home:null };
+function shipFee(pick,sub){ const t=SHIP_FREE[pick]; return t!=null&&sub>=t?0:FX[pick]; }
+function freeGap(pick,sub){ const t=SHIP_FREE[pick]; return t!=null&&sub<t?t-sub:0; }
 
 /* =========================================================================
    資料層 — 前端唯一對外出口。CFG.mock=true 走本機假資料，false 走後端 japan-system（/api/v1）。
@@ -573,7 +578,8 @@ async function req(path,{method="GET",body=null,idem=null,retry=CFG.retry}={}){
   }catch(e){
     clearTimeout(timer);
     const st=e&&e.data&&e.data.status;
-    const retriable = !(e instanceof ApiErr) || st>=500;     // 只重試網路錯誤與 5xx
+    // 只重試網路錯誤與 5xx；NOT_CONFIGURED（線上付款還沒開通）是固定狀態，重試也一樣，直接回報
+    const retriable = !(e instanceof ApiErr) || (st>=500 && e.code!=="NOT_CONFIGURED");
     if(retriable && retry>0){ await wait(600*(CFG.retry-retry+1)); return req(path,{method,body,idem,retry:retry-1}); }
     throw (e instanceof ApiErr)?e:new ApiErr("NET","連線不穩，請稍後再試");
   }
@@ -627,7 +633,7 @@ var API={
     if(payway==="bank") return {payway,manual:true};
     const r=await P_("/statements/pay-init",{statement_id:sid,payway,invoice},"建立付款");
     if(r.flow==="vacc") return {payway,vacc:r.v_account,bank:r.v_bank,due:fmtDue(r.v_expire_at),expireAt:r.v_expire_at};
-    return {payway,redirect:r.action,fields:r.fields||{},tradeNo:(r.fields||{}).MerchantTradeNo};
+    return {payway,redirect:r.action,fields:r.fields||{},tradeNo:(r.fields||{}).MerchantTradeNo,testMode:!!r.test_mode};
   }
 };
 
@@ -665,7 +671,8 @@ var M={
   me:(m)=>Object.assign(DB.me,{userId:m.line_user_id,memberNo:m.member_no||"",name:m.display_name||m.nickname,nickname:m.nickname,
     joined:fmtDate(m.created_at),status:m.status,lastBind:fmtTs(m.bound_at),phone:m.phone||"",
     pickup:m.cvs_store_name?`${m.cvs_brand||""} ${m.cvs_store_name}`.trim():DB.me.pickup,pickupAddr:m.cvs_addr||"",
-    pickupId:m.cvs_store_id||"",addr:m.home_addr||"",carrier:m.carrier||"",drops:m.shout_drops||0})
+    pickupId:m.cvs_store_id||"",addr:m.home_addr||"",carrier:m.carrier||"",drops:m.shout_drops||0,
+    dropsLimit:m.drops_limit||DB.me.dropsLimit||1,suspended:typeof m.shout_suspended==="boolean"?m.shout_suspended:(m.shout_drops||0)>=(m.drops_limit||1)})
 };
 
 /* 以隱藏表單 POST 導向綠界（綠界要求 form POST，不能用網址導轉） */
@@ -690,7 +697,7 @@ async function mockApi(path,method,body){
     return {flow:"redirect",action:"https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",fields:{MerchantTradeNo:"EC"+Date.now()}};
   }
   if(path==="/health") return {status:"ok",db:{up:true}};
-  if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops};
+  if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops,drops_limit:DB.me.dropsLimit,shout_suspended:DB.me.drops>=DB.me.dropsLimit};
   return {mock:true};
 }
 function mockInvoice(){ return {st:"issued",no:"AB-"+Math.floor(1e7+Math.random()*9e7),date:now(),carrier:DB.me.carrier}; }
@@ -949,6 +956,7 @@ async function boot(){
       TRIP=home.batch?M.batch(home.batch):{code:"",name:"目前沒有開放中的團",region:"下一團開放時會在聊天室通知",
         closeAt:new Date(0),buyAt:"—",backAt:"—",shipAt:"—",joined:0,orders:0,stage:0};
       if(home.shop.ship_fee) Object.assign(FX,home.shop.ship_fee);   // 運費以後台設定為準
+      if(home.shop.ship_free) Object.assign(SHIP_FREE,home.shop.ship_free);
       PRICE_TABLE=home.price_table.map(r=>[r.jpy_taxed_max,r.twd]);
       Object.assign(SHOP,{name:home.shop.name,bankName:home.shop.bank_name,bankCode:home.shop.bank_code,
         bankAccount:home.shop.bank_account,bankHolder:home.shop.bank_holder||"",payDeadlineDays:home.shop.payment_deadline_days});
@@ -1108,7 +1116,7 @@ DB={
    pickup:"7-11 板橋文化門市", pickupAddr:"新北市板橋區文化路188號", pickupId:"148326",
    addr:"新北市板橋區文化路一段188號 5樓", carrier:"/AB12+3C",
    notify:{order:true,quote:true,ship:true,live:true,split:true},
-   shoutAck:false, drops:0, waitlist:[], restock:[],
+   shoutAck:false, drops:0, dropsLimit:1, suspended:false, waitlist:[], restock:[],
    recent:[{b:"7-11",c:"#E03C31",n:"板橋文化門市",id:"148326",a:"新北市板橋區文化路188號",city:"新北市",dist:"板橋區"}]},
  seq:22};
 S={tab:"home",cat:"全部",q:"",cart:[],open:new Set(),showAll:false,
@@ -1191,21 +1199,27 @@ function dropAsk(k,l){
   openSheet("取消喊單",`
     <p class="sm" style="color:var(--ink-2);margin-top:0">
       <b>${esc(l.n)}</b> 是連線喊到的商品，小幫手可能已經在現場拿取。</p>
-    <div class="alert beni">取消會列入<b>棄單紀錄</b>。累積 3 次，之後的連線將無法喊單，需改走許願代找。<br>
-      目前棄單紀錄：<b>${DB.me.drops} 次</b></div>`,
+    ${DB.me.drops+1>=DB.me.dropsLimit
+      ?`<div class="alert beni"><b>取消後會暫停喊單資格</b><br>棄單上限是 ${DB.me.dropsLimit} 次，這次取消就會達到。
+        暫停期間連線無法喊單，可以改用許願代找；<b>對帳單全部付清後自動恢復</b>。</div>`
+      :`<div class="alert beni">取消會列入<b>棄單紀錄</b>。累積 ${DB.me.dropsLimit} 次會暫停喊單資格，對帳單全部付清後自動恢復。<br>
+        目前棄單紀錄：<b>${DB.me.drops} / ${DB.me.dropsLimit} 次</b></div>`}`,
     `<button class="btn danger block" onclick="doDrop('${k}')">仍要取消喊單</button>
      <button class="btn quiet block" style="margin-top:8px" onclick="closeSheet()">留著，我要買</button>`);
 }
 function doDrop(k){
   const l=S.cart.find(x=>x.k===k);
   const li=DB.broadcast.find(x=>x.no===l.ref); if(li)li.left+=l.q;
-  DB.me.drops++;
+  const prev={drops:DB.me.drops,suspended:DB.me.suspended};
+  DB.me.drops++; DB.me.suspended=DB.me.drops>=DB.me.dropsLimit;
   S.cart=S.cart.filter(x=>x.k!==k);
   closeSheet();syncBadge();render();
-  toast(`已取消喊單・棄單紀錄 ${DB.me.drops} / 3`,2600);
+  toast(DB.me.suspended?"已取消喊單・喊單資格暫停，付清對帳單後恢復":`已取消喊單・棄單紀錄 ${DB.me.drops} / ${DB.me.dropsLimit}`,2800);
   if(l.cid) API.cartRemove(l.cid)
-    .then(r=>{ if(r&&typeof r.shout_drops==="number"){ DB.me.drops=r.shout_drops; render(); } })
-    .catch(()=>{ if(li)li.left-=l.q; DB.me.drops--; S.cart.push(l); syncBadge(); render(); });}
+    .then(r=>{ if(r&&typeof r.shout_drops==="number"){ DB.me.drops=r.shout_drops;
+      if(r.drops_limit) DB.me.dropsLimit=r.drops_limit;
+      DB.me.suspended=typeof r.shout_suspended==="boolean"?r.shout_suspended:DB.me.drops>=DB.me.dropsLimit; render(); } })
+    .catch(()=>{ if(li)li.left-=l.q; Object.assign(DB.me,prev); S.cart.push(l); syncBadge(); render(); });}
 
 /* ---------- 連線喊單 ---------- */
 async function shout(no,n,confirmed){
@@ -1222,7 +1236,7 @@ async function shout(no,n,confirmed){
   }catch(e){
     if(e.code==="SOLD_OUT"){ it.left=0; render(); return waitlist(no); }
     if(e.code==="DEADLINE_PASSED"){ it.deadline="已截止"; render(); return; }
-    if(e.code==="SUSPENDED"){ DB.me.drops=Math.max(DB.me.drops,3); render(); return; }
+    if(e.code==="SUSPENDED"){ DB.me.suspended=true; DB.me.drops=Math.max(DB.me.drops,DB.me.dropsLimit); render(); return; }
     return;                                     // 其他錯誤已提示，不動狀態
   }
   if(!take){ it.left=0; render(); return waitlist(no); }
@@ -1386,7 +1400,7 @@ function reviewOrder(){
   const C=S.cart.filter(l=>l.st!=="pending");
   if(!C.length){ toast("請先確認購物車裡的品項"); return; }
   if(S.inv==="tax"&&!/^\d{8}$/.test(S.taxId)){toast("統一編號需為 8 碼數字");return;}
-  const sub=C.reduce((a,l)=>a+(l.p||0)*l.q,0),ship=S.pick==="cvs"?FX.cvs:FX.home;
+  const sub=C.reduce((a,l)=>a+(l.p||0)*l.q,0),ship=shipFee(S.pick,sub);
   openSheet("確認訂單",`
     <div class="list">${C.map(l=>
       `<div class="item"><div class="ph">${l.e}</div><div class="info">
@@ -1394,7 +1408,7 @@ function reviewOrder(){
         <div class="sm" style="font-weight:700;align-self:center">${l.p?`NT$${nf(l.p*l.q)}`:"待報價"}</div></div>`).join("")}</div>
     <div class="sumbox" style="margin-top:12px">
       <div class="sumrow"><span>商品小計</span><span>NT$${nf(sub)}</span></div>
-      <div class="sumrow"><span>台灣端運費</span><span>NT$${nf(ship)}</span></div>
+      <div class="sumrow"><span>台灣端運費</span><span>${ship?`NT$${nf(ship)}`:"免運"}</span></div>
       <div class="sumrow"><span>國際運費</span><span class="dim">已含在商品報價內</span></div>
       <div class="sumrow total"><span>本次應付</span><span>NT$${nf(sub+ship)}</span></div></div>
     <div class="sumbox" style="margin-top:10px">
@@ -1412,7 +1426,7 @@ function checkout(){
   const C=S.cart.filter(l=>l.st!=="pending");
   if(!C.length)return;
   if(!CFG.mock) return checkoutLive(C);
-  const ship=S.pick==="cvs"?FX.cvs:FX.home, sub=C.reduce((a,l)=>a+(l.p||0)*l.q,0), d=new Date(); DB.seq++;
+  const sub=C.reduce((a,l)=>a+(l.p||0)*l.q,0), ship=shipFee(S.pick,sub), d=new Date(); DB.seq++;
   const o={id:`ORD-2609${pad(d.getDate())}-${pad(DB.seq)}`,
     trip:TRIP.name,date:`${d.getMonth()+1}/${pad(d.getDate())}`,st:0,pay:"待付款",
     split_shipped:false,stmt:null,
@@ -1659,9 +1673,9 @@ function openChat(){
 }
 function creditInfo(){
   openSheet("喊單信用",`
-    <div class="alert ${DB.me.drops>=3?"beni":DB.me.drops?"gold":"pine"}" style="margin-top:0">
-      ${DB.me.drops>=3?"<b>喊單資格已暫停</b><br>棄單已達 3 次，連線期間請改用許願代找。"
-        :DB.me.drops?`<b>棄單 ${DB.me.drops} / 3 次</b><br>再棄單 ${3-DB.me.drops} 次將暫停喊單資格。`
+    <div class="alert ${DB.me.suspended?"beni":DB.me.drops?"gold":"pine"}" style="margin-top:0">
+      ${DB.me.suspended?`<b>喊單資格已暫停</b><br>棄單已達 ${DB.me.dropsLimit} 次。暫停期間連線無法喊單，可以改用許願代找；對帳單全部付清後自動恢復。`
+        :DB.me.drops?`<b>棄單 ${DB.me.drops} / ${DB.me.dropsLimit} 次</b><br>再棄單 ${DB.me.dropsLimit-DB.me.drops} 次將暫停喊單資格。`
         :"<b>信用正常</b><br>目前沒有棄單紀錄，可正常參加連線喊單。"}</div>
     <div class="sm" style="color:var(--ink-2);line-height:1.95;margin-top:14px">
       <b style="color:var(--ink)">什麼算棄單</b><br>
@@ -1669,7 +1683,7 @@ function creditInfo(){
       <b style="color:var(--ink)">為什麼要記</b><br>
       連線商品是小幫手在現場實際拿下的實體商品，棄單等於店家自己吃下。<br><br>
       <b style="color:var(--ink)">怎麼恢復</b><br>
-      連續兩團正常完成結帳，紀錄自動歸零。</div>`);
+      對帳單全部付清後，棄單紀錄自動歸零、恢復喊單資格。有疑問可以從「轉接客服」詢問小幫手。</div>`);
 }
 
 function terms(){
@@ -1973,8 +1987,8 @@ function saveLine(k){
 function vCart(){
   if(!S.cart.length)return blank("🛒","購物車還是空的","拍照、打字、喊單、許願，四種方式都會集中到這裡。","回到下單","home");
   const pend=S.cart.filter(l=>l.st==="pending"), conf=S.cart.filter(l=>l.st!=="pending");
-  const ship=S.pick==="cvs"?FX.cvs:FX.home;
   const sub=conf.reduce((a,l)=>a+(l.p||0)*l.q,0);
+  const ship=shipFee(S.pick,sub), gap=freeGap(S.pick,sub);
   const noPrice=conf.filter(l=>!l.p).length;
   return `<div class="wrap"><div class="cg"><div class="cg-main">
     <div class="h2">購物車 <span class="dim tiny" style="font-weight:400">${cCount()} 件</span></div>
@@ -1994,8 +2008,8 @@ function vCart(){
     </div><div class="cg-side">
     <div class="h2">取貨與發票</div>
     <div class="field"><label>取貨方式</label><div class="opts">
-      <button class="opt ${S.pick==="cvs"?"on":""}" onclick="setPick('cvs')">超商取貨<br><span class="tiny dim">NT$${FX.cvs}</span></button>
-      <button class="opt ${S.pick==="home"?"on":""}" onclick="setPick('home')">宅配到府<br><span class="tiny dim">NT$${FX.home}</span></button></div></div>
+      <button class="opt ${S.pick==="cvs"?"on":""}" onclick="setPick('cvs')">超商取貨<br><span class="tiny dim">NT$${FX.cvs}${SHIP_FREE.cvs!=null?`・滿 ${nf(SHIP_FREE.cvs)} 免運`:""}</span></button>
+      <button class="opt ${S.pick==="home"?"on":""}" onclick="setPick('home')">宅配到府<br><span class="tiny dim">NT$${FX.home}${SHIP_FREE.home!=null?`・滿 ${nf(SHIP_FREE.home)} 免運`:""}</span></button></div></div>
     ${S.pick==="cvs"?`<div class="field"><label>取貨門市</label>
         <div class="ro" style="padding:11px 12px;border:1px solid var(--line);border-radius:10px" onclick="pickStore()">
           <b class="sm">${esc(DB.me.pickup)}</b> <span class="tiny dim">#${DB.me.pickupId}</span>
@@ -2017,7 +2031,8 @@ function vCart(){
     <div class="sumbox">
       <div class="sumrow"><span>已報價小計</span><span>NT$${nf(sub)}</span></div>
       ${noPrice?`<div class="sumrow"><span>待報價 ${noPrice} 筆</span><span class="dim">小幫手現場回報</span></div>`:""}
-      <div class="sumrow"><span>台灣端運費</span><span>NT$${nf(ship)}</span></div>
+      <div class="sumrow"><span>台灣端運費</span><span>${ship?`NT$${nf(ship)}`:`<b style="color:var(--pine-deep)">免運</b>`}</span></div>
+      ${gap?`<div class="sumrow" id="freeGap"><span class="tiny" style="color:var(--pine-deep)">再買 NT$${nf(gap)} 就免運</span><span></span></div>`:""}
       <div class="sumrow"><span>國際運費</span><span class="dim">已含在商品報價內</span></div>
       <div class="sumrow total"><span>目前小計</span><span>NT$${nf(sub+ship)}</span></div></div>
     <p class="tiny dim" style="margin:9px 2px 0;line-height:1.75">
@@ -2333,7 +2348,12 @@ async function doPay(sid){
   const t=DB.stmts.find(x=>x.id===sid), w=S.payway;
   let r;
   try{ r=await API.payInit(sid,w,{type:S.inv,carrier:DB.me.carrier,tax_id:S.taxId}); }
-  catch(e){ return; }
+  catch(e){
+    // 線上付款還沒開通（金鑰未設定，或測試環境只開放店家帳號）：引導改用銀行轉帳
+    if(e.code==="NOT_CONFIGURED"){ S.payway="bank"; payStmt(sid);
+      const z=$("#payzone"); if(z) z.innerHTML=`<div class="alert gold" style="margin-top:14px">
+        <b>${PAYWAY[w].t}付款暫時無法使用</b><br>已幫你切換成銀行轉帳，按下方按鈕查看匯款資訊。</div>`; }
+    return; }
   t.payway=w;
   if(w==="bank"){
     $("#payzone").innerHTML=`
@@ -2365,7 +2385,8 @@ async function doPay(sid){
   }
   /* 信用卡 / LINE Pay：導轉到金流頁 */
   $("#payzone").innerHTML=`<div class="alert pine" style="margin-top:14px">
-    <span class="spin"></span> 正在前往${PAYWAY[w].t}付款頁…</div>`;
+    <span class="spin"></span> 正在前往${PAYWAY[w].t}付款頁…
+    ${r.testMode?`<br><span class="pill gold" style="margin-top:6px">測試中</span> <span class="tiny">綠界測試環境，不會真的扣款</span>`:""}</div>`;
   await wait(1200);
   if(CFG.mock){                                  // 原型模式直接模擬付款成功
     t.pay="已核對"; t.paidAt=now(); t.tradeNo=r.tradeNo;
@@ -2462,7 +2483,7 @@ function vMe(){
           <span class="tiny dim">${DB.stmts.filter(t=>t.inv&&t.inv.st==="issued").length} 張已開立</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="creditInfo()"><span style="font-size:17px">⭐</span>
         <span><span style="font-weight:500">喊單信用</span><br>
-          <span class="tiny dim">${DB.me.drops?`棄單 ${DB.me.drops} / 3 次`:"正常・可參加連線喊單"}</span></span><span class="ar">›</span></button>
+          <span class="tiny dim">${DB.me.suspended?"喊單資格暫停中・付清對帳單後恢復":DB.me.drops?`棄單 ${DB.me.drops} / ${DB.me.dropsLimit} 次`:"正常・可參加連線喊單"}</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="terms()"><span style="font-size:17px">❓</span>
         <span><span style="font-weight:500">代購須知</span><br><span class="tiny dim">價格、缺貨、拆單、取貨與結算規則</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="support()"><span style="font-size:17px">💬</span>
