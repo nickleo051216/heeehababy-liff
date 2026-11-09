@@ -502,9 +502,10 @@ var IMG_REFRESH={at:0,busy:false};
 function imgExpired(){
   if(CFG.mock||IMG_REFRESH.busy||Date.now()-IMG_REFRESH.at<60000) return;
   IMG_REFRESH.busy=true; IMG_REFRESH.at=Date.now();
-  Promise.all([req("/cart/list"),req("/wishes/list")]).then(([cart,wishes])=>{
+  Promise.all([req("/cart/list"),req("/wishes/list"),req("/home/summary").catch(()=>null)]).then(([cart,wishes,home])=>{
     (cart||[]).forEach(c=>{ const l=S.cart.find(x=>x.cid===c.cart_id); if(l&&c.image_url) l.img=c.image_url; });
     (wishes||[]).forEach(w=>{ const x=DB.wishes.find(y=>y.id===w.wish_id); if(x&&w.picture) x.img=w.picture; });
+    ((home&&home.broadcast)||[]).forEach(b=>{ const x=DB.broadcast.find(y=>y.no===b.send_id); if(x&&b.image_url) x.img=b.image_url; });
     render();
   }).catch(()=>{}).finally(()=>{ IMG_REFRESH.busy=false; });
 }
@@ -1247,7 +1248,7 @@ async function shout(no,n,confirmed){
   const l=line("broadcast",no);
   const cid=r.cart_item&&r.cart_item.cart_id;
   if(l){ l.q+=take; l.max=l.q+it.left; if(cid) l.cid=cid; }
-  else S.cart.push({k:"L"+no,cid,src:"broadcast",ref:no,n:it.n,e:it.e,p:it.p,jpy:it.jpy,q:take,
+  else S.cart.push({k:"L"+no,cid,src:"broadcast",ref:no,n:it.n,e:it.e,img:it.img||null,p:it.p,jpy:it.jpy,q:take,
                     max:take+it.left,conf:"high",st:"confirmed",note:it.note||""});
   syncBadge(true);
   const rank=it.qty-it.left;
@@ -1839,14 +1840,18 @@ function bcCard(it){
   return `<div class="livecard ${it.left===0?"sold":""}">
     <div class="row" style="align-items:flex-start">
       <div class="lno">${it.no.split("-").pop()}</div>
-      <div class="zoomable" style="width:56px;height:56px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;font-size:26px;flex:none"
-        onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')">${it.e}</div>
+      ${it.img
+        ? `<div class="zoomable" style="width:72px;height:72px;border-radius:11px;background:var(--surface-2);overflow:hidden;flex:none"
+            onclick="lightbox('img','${jsq(it.img)}','${jsq(it.n)}')">
+            <img src="${esc(it.img)}" alt="${esc(it.n)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="imgExpired()"></div>`
+        : `<div class="zoomable" style="width:56px;height:56px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;font-size:26px;flex:none"
+            onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')">${it.e}</div>`}
       <div style="flex:1;min-width:0">
         <b class="sm" style="font-weight:700;line-height:1.45;display:block">${esc(it.n)}</b>
         ${it.note?`<div class="tiny dim">${esc(it.note)}</div>`:""}
         <div class="row" style="gap:6px;margin-top:3px">
           <span style="font-weight:900;color:var(--pine-deep);font-size:17px">NT$${nf(it.p)}</span>
-          <span class="tiny dim">税込 ¥${nf(it.jpy)}</span>
+          ${it.jpy?`<span class="tiny dim">税込 ¥${nf(it.jpy)}</span>`:""}
           ${it.hot?`<span class="pill beni">熱門</span>`:""}</div>
         <div class="tiny" style="color:var(--beni);font-weight:700;margin-top:2px">${esc(it.deadline)} 截止</div>
       </div></div>
