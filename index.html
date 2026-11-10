@@ -174,6 +174,11 @@ font-size:12.5px;font-weight:700;color:var(--pine-deep);line-height:1.5}
 .wishbtn em{display:block;font-style:normal;font-size:21px;margin-bottom:3px}
 .wish{background:var(--surface);border:1px solid var(--line-soft);border-radius:13px;padding:13px 14px;margin-bottom:10px}
 .wish .pv{width:52px;height:52px;border-radius:9px;object-fit:cover;flex:none;border:1px solid var(--line-soft)}
+.wall .pv{width:72px;height:72px;border-radius:10px;object-fit:cover;flex:none;border:1px solid var(--line-soft)}
+.wall .ph{width:72px;height:72px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font-size:30px;flex:none}
+.wants{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--pine-deep)}
+.pubchk{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-radius:11px;padding:11px 12px;margin:4px 0 12px;cursor:pointer}
+.pubchk input{margin-top:3px;width:18px;height:18px;flex:none}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px}
 .field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:14px}
@@ -506,6 +511,7 @@ function imgExpired(){
     (cart||[]).forEach(c=>{ const l=S.cart.find(x=>x.cid===c.cart_id); if(l&&c.image_url) l.img=c.image_url; });
     (wishes||[]).forEach(w=>{ const x=DB.wishes.find(y=>y.id===w.wish_id); if(x&&w.picture) x.img=w.picture; });
     ((home&&home.broadcast)||[]).forEach(b=>{ const x=DB.broadcast.find(y=>y.no===b.send_id); if(x&&b.image_url) x.img=b.image_url; });
+    if(S.wishView==="wall") return loadBoard(true);
     render();
   }).catch(()=>{}).finally(()=>{ IMG_REFRESH.busy=false; });
 }
@@ -625,6 +631,9 @@ var API={
   wishToCart   : (id)=>P_("/wishes/to-cart",{wish_id:id},"加入購物車"),
   wishKeep     : (id)=>P_("/wishes/keep",{wish_id:id},"保留許願"),
   wishRemove   : (id)=>P_("/wishes/remove",{wish_id:id},"刪除許願"),
+  wishBoard    : (sort)=>G_("/wishes/board?sort="+(sort==="new"?"new":"hot"),"載入許願牆"),
+  wishPlus     : (id,on)=>P_("/wishes/plus",{wish_id:id,on},"+1"),
+  wishShare    : (id,pub)=>P_("/wishes/share",{wish_id:id,public:pub},"許願牆設定"),
   checkout     : (b)=>P_("/orders/checkout",b,"送出訂單"),
   orderList    : ()=>G_("/orders/list","載入訂單"),
   splitRequest : (oid,on)=>P_("/orders/split-request",{order_id:oid,on},"申請先出貨"),
@@ -659,7 +668,13 @@ var M={
       st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done}; },
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
-    quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null}),
+    quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null,
+    wall:w.wall_status||"private",votes:w.votes||0,bcNo:w.broadcast_send_id||null}),
+  /* 許願牆一則：只有商品和人數，沒有任何人的身分（合約 27） */
+  board:(b)=>({id:b.wish_id,title:b.item_name,img:b.picture||null,votes:b.votes||0,wants:b.wants||((b.votes||0)+1),
+    voted:!!b.voted,mine:!!b.mine,quote:b.quote_twd,
+    bc:b.broadcast?{no:b.broadcast.send_id,p:b.broadcast.price_twd,left:b.broadcast.remaining,
+      deadline:b.broadcast.deadline_at?fmtTs(b.broadcast.deadline_at):""}:null}),
   order:(o)=>{ const st=OS.indexOf(o.status); const log={};
     (o.status_log||[]).forEach(x=>{ const i=OS.indexOf(x.to_status); if(i>=0) log[i]=fmtTs(x.ts); });
     return {id:o.order_id,trip:(TRIP&&TRIP.code===o.batch)?TRIP.name:(o.batch||""),date:fmtDate(o.created_at),
@@ -701,6 +716,23 @@ async function mockApi(path,method,body){
     return {flow:"redirect",action:"https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",fields:{MerchantTradeNo:"EC"+Date.now()}};
   }
   if(path==="/health") return {status:"ok",db:{up:true}};
+  if(path.indexOf("/wishes/board")===0){
+    const rows=DB.boardSeed.slice();
+    if(/sort=new/.test(path)) rows.reverse(); else rows.sort((a,b)=>b.votes-a.votes);
+    return rows;
+  }
+  if(path==="/wishes/plus"){
+    const b=DB.boardSeed.find(x=>x.wish_id===body.wish_id);
+    if(!b) throw new ApiErr("NOT_FOUND","這則許願已經不在牆上了",{status:404});
+    if(b.mine) throw new ApiErr("OWN_WISH","不能幫自己的許願 +1",{status:409});
+    if(b.voted!==body.on){ b.voted=body.on; b.votes+=body.on?1:-1; b.wants=b.votes+1; }
+    return {wish_id:b.wish_id,voted:b.voted,votes:b.votes,wants:b.wants};
+  }
+  if(path==="/wishes/share"){
+    const w=DB.wishes.find(x=>x.id===body.wish_id);
+    if(w&&w.wall==="hidden"&&body.public) throw new ApiErr("HIDDEN_BY_SHOP","店家已經把這則收下來了",{status:409});
+    return {wish_id:body.wish_id,wall_status:body.public?(w&&w.wall==="public"?"public":"pending"):"private",votes:w?w.votes:0};
+  }
   if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops,drops_limit:DB.me.dropsLimit,shout_suspended:DB.me.drops>=DB.me.dropsLimit};
   return {mock:true};
 }
@@ -871,6 +903,7 @@ function routeDeepLink(){
   if(["home","live","wish","cart","orders","me"].indexOf(path)>=0) S.tab=path;
   if(path==="orders"&&id){ S.open.add(id); S.oFilter="live"; }
   if(path==="stmt"){ S.tab="orders"; S.oFilter="stmt"; }
+  if(path==="wall"){ S.tab="wish"; S.wishView="wall"; S.boardAt=0; }
 }
 
 /* ---- LINE 專屬能力（外部瀏覽器自動降級） ---- */
@@ -1084,8 +1117,15 @@ DB={
   {no:"BC-0913-001",n:"麵包超人 造型圍兜 兩件",e:"🎽",jpy:1309,p:490,qty:6,left:0,
    deadline:"已截止",note:"款式：藍／紅",at:"9 分鐘前",hot:false}],
  wishes:[
-  {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null},
-  {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null}],
+  {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null,wall:"public",votes:4,bcNo:null},
+  {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null,wall:"private",votes:0,bcNo:null}],
+ board:[],
+ boardSeed:[
+  {wish_id:"W-104",item_name:"日本限定 麵包超人 溫度感應湯匙",picture:null,votes:4,wants:5,voted:false,mine:true,quote_twd:980,broadcast:null},
+  {wish_id:"W-091",item_name:"阿卡將 限定口水巾 三入",picture:null,votes:11,wants:12,voted:true,mine:false,quote_twd:null,
+   broadcast:{send_id:"BC-0913-003",price_twd:350,remaining:14,deadline_at:null}},
+  {wish_id:"W-087",item_name:"Combi 吸管水壺 替換吸管組",picture:null,votes:6,wants:7,voted:false,mine:false,quote_twd:null,broadcast:null},
+  {wish_id:"W-080",item_name:"西松屋 有機棉 短袖包屁衣 80cm",picture:null,votes:2,wants:3,voted:false,mine:false,quote_twd:null,broadcast:null}],
  orders:[
   {id:"ORD-20260901-014",trip:"0913 大阪團",date:"09/01",st:2,pay:"待付款",split_shipped:false,stmt:null,
    items:[{n:"六重紗布浴巾 90×90 兩入",q:1,jpy:2519,p:890,e:"🧺",ist:"已到貨"},
@@ -1124,7 +1164,7 @@ DB={
    recent:[{b:"7-11",c:"#E03C31",n:"板橋文化門市",id:"148326",a:"新北市板橋區文化路188號",city:"新北市",dist:"板橋區"}]},
  seq:22};
 S={tab:"home",cat:"全部",q:"",cart:[],open:new Set(),showAll:false,
-   pick:"cvs",inv:"carrier",taxId:"",note:"",mergeSel:new Set(),oFilter:"live",
+   pick:"cvs",inv:"carrier",taxId:"",note:"",mergeSel:new Set(),oFilter:"live",wishView:"mine",boardSort:"hot",boardAt:0,
    pkCity:"新北市",pkDist:"板橋區",pkQ:"",payway:"credit",_sid:null};
 }
 seed();
@@ -1544,6 +1584,9 @@ function wishForm(kind,pre){
    `${f}
     <div class="field"><label>數量</label><input id="wq" type="number" value="1" min="1" max="20" inputmode="numeric"></div>
     <div class="field"><label>備註（顏色、尺寸、預算上限）</label><input id="wn" placeholder="選填"></div>
+    <label class="pubchk"><input type="checkbox" id="wpub">
+      <span><b class="sm">公開到許願牆，讓大家一起 +1</b>
+      <span class="tiny dim" style="display:block;line-height:1.6;margin-top:2px">店家看過才會公開，不會顯示你的名字和備註。想要的人越多，越有機會開成喊單。</span></span></label>
     <p class="tiny dim" style="line-height:1.7">送出後會先辨識商品，再由日本現場的小幫手確認供貨與價格。許願不等於保留名額。</p>`,
    `<button class="btn primary block" onclick="submitWish('${kind}')">送出許願</button>`);
 }
@@ -1566,11 +1609,11 @@ async function submitWish(kind){
   const src=kind==="photo"?(_wishImg?"（照片）":null):($("#wsrc")&&$("#wsrc").value.trim());
   if(!src){toast(kind==="photo"?"請先選擇一張照片":"請先填寫內容");return;}
   if(kind==="link"&&!/^https?:\/\//.test(src)){toast("請貼上完整網址，需以 http(s):// 開頭");return;}
-  const q=Math.max(1,parseInt($("#wq").value||"1",10)),note=$("#wn").value.trim();
+  const q=Math.max(1,parseInt($("#wq").value||"1",10)),note=$("#wn").value.trim(),pub=!!($("#wpub")&&$("#wpub").checked);
   const w={id:"W-"+(105+DB.wishes.length),src:{photo:"照片",link:"連結",text:"文字"}[kind],
     title:kind==="link"?"辨識中的商品連結":kind==="text"?src.slice(0,28):"辨識中的商品照片",
     raw:src,note,qty:q,st:"parsing",at:now().split(" ")[0],img:kind==="photo"?_wishImg:null,
-    file:kind==="photo"?_wishFile:null};
+    file:kind==="photo"?_wishFile:null,wall:pub?"pending":"private",votes:0,bcNo:null};
   let data=kind==="photo"?w.img:undefined;
   if(kind==="photo"&&!CFG.mock){
     try{ data=await shrinkImage(_wishRaw); w.file=jpgName(w.file); }
@@ -1579,8 +1622,8 @@ async function submitWish(kind){
   DB.wishes.unshift(w);_wishImg=null;_wishFile=null;_wishRaw=null;closeSheet();go("wish");
   toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後可以在「許願」頁查看",2600);
   API.wishCreate({src:kind,item_name:kind==="text"?src:undefined,ref_url:kind==="link"?src:undefined,
-      quantity:q,note,file_name:w.file,data})
-    .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock) w.title=r.item_name; } })
+      quantity:q,note,file_name:w.file,data,public:pub||undefined})
+    .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock){ w.title=r.item_name; if(r.wall_status) w.wall=r.wall_status; if(r.picture) w.img=r.picture; } } })
     .catch(()=>{ DB.wishes=DB.wishes.filter(x=>x!==w); render(); });
   if(!CFG.mock) return;                             // 正式模式由店家在後台報價，不模擬
   await wait(4000);
@@ -1604,6 +1647,51 @@ function wishKeep(id){const w=DB.wishes.find(x=>x.id===id),prev=w.st;w.st="kept"
   API.wishKeep(id).catch(()=>{ w.st=prev; render(); });}
 function wishDrop(id){const w=DB.wishes.find(x=>x.id===id);DB.wishes=DB.wishes.filter(x=>x.id!==id);syncBadge();render();toast("已刪除此筆許願");
   API.wishRemove(id).catch(()=>{ DB.wishes.push(w); syncBadge(); render(); });}
+
+/* ---------- 許願牆（合約 27～29）---------- */
+function setWV(v){ S.wishView=v; if(v==="wall") loadBoard(); else render(); }
+function setBS(v){ S.boardSort=v; loadBoard(true); }
+/* 30 秒內切回來不重拉；force 用在換排序、照片過期 */
+async function loadBoard(force){
+  if(!force&&S.boardAt&&Date.now()-S.boardAt<30000) return render();
+  S.boardBusy=true; render();
+  try{ DB.board=(await API.wishBoard(S.boardSort)||[]).map(M.board); S.boardAt=Date.now(); S.boardErr=false; }
+  catch(e){ S.boardErr=true; }
+  finally{ S.boardBusy=false; render(); }
+}
+/* +1 先改畫面，失敗再改回去；以後端回的人數為準 */
+function wishPlus(id){
+  const b=DB.board.find(x=>x.id===id); if(!b||b.mine) return;
+  const on=!b.voted, prev={voted:b.voted,votes:b.votes,wants:b.wants};
+  b.voted=on; b.votes+=on?1:-1; b.wants+=on?1:-1; render();
+  toast(on?"已 +1，開成喊單時會用 LINE 通知你":"已取消 +1");
+  API.wishPlus(id,on).then(r=>{ if(r){ b.voted=!!r.voted; b.votes=r.votes; b.wants=r.wants; render(); } })
+    .catch(e=>{ Object.assign(b,prev);
+      if(e.code==="NOT_FOUND") DB.board=DB.board.filter(x=>x!==b);
+      if(e.code==="OWN_WISH") b.mine=true;
+      render(); });
+}
+/* 許願牆上已開成喊單的「去搶」：首頁有這張喊單就直接用，沒有就用牆上的資料補一張 */
+async function wallShout(id){
+  const b=DB.board.find(x=>x.id===id); if(!b||!b.bc) return;
+  if(!DB.broadcast.find(x=>x.no===b.bc.no))
+    DB.broadcast.push({no:b.bc.no,n:b.title,e:"⭐",jpy:null,p:b.bc.p,qty:b.bc.left,left:b.bc.left,
+      deadline:b.bc.deadline||"",note:"",at:"",hot:false,img:b.img});
+  await shout(b.bc.no,1);
+  const it=DB.broadcast.find(x=>x.no===b.bc.no); if(it){ b.bc.left=it.left; render(); }
+}
+function wishShare(id){
+  const w=DB.wishes.find(x=>x.id===id); if(!w||w.wall==="hidden") return;
+  const pub=w.wall==="private", prev=w.wall;
+  w.wall=pub?"pending":"private"; S.boardAt=0; render();
+  toast(pub?"已送出，店家看過就會放上許願牆":"已從許願牆收回，之前的 +1 會保留");
+  API.wishShare(id,pub).then(r=>{ if(r&&r.wall_status){ w.wall=r.wall_status; if(typeof r.votes==="number") w.votes=r.votes; render(); } })
+    .catch(e=>{ w.wall=e.code==="HIDDEN_BY_SHOP"?"hidden":prev; render(); });
+}
+function goBroadcast(no){
+  if(DB.broadcast.find(x=>x.no===no&&x.left>0)) return go("live");
+  S.wishView="wall"; loadBoard(true);
+}
 
 /* ---------- 我的 ---------- */
 function toggleNotify(k){DB.me.notify[k]=!DB.me.notify[k];render();
@@ -2106,8 +2194,56 @@ function vLive(){
   </div>`;
 }
 
+const WALL={private:null,pending:{t:"等店家審核",c:"gold"},public:{t:"在許願牆上",c:"pine"},hidden:{t:"店家已收下",c:"beni"}};
+function wishWallLine(w){
+  if(w.bcNo) return `<button class="btn primary sm block" style="margin-top:10px" onclick="goBroadcast('${jsq(w.bcNo)}')">🙌 已開喊單 ${esc(w.bcNo)}，去搶 →</button>`;
+  if(["converted"].indexOf(w.st)>=0) return "";
+  const s=WALL[w.wall];
+  return `<div class="between" style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)">
+    <div class="tiny" style="min-width:0">
+      ${s?`<span class="pill ${s.c}" style="font-size:11px">${s.t}</span>`:`<span class="dim">只有你看得到</span>`}
+      ${w.votes>0?`<span class="wants" style="margin-left:6px">🙋 還有 ${w.votes} 人也想要</span>`:""}</div>
+    ${w.wall==="hidden"?"":`<button class="btn quiet sm" style="flex:none" onclick="wishShare('${jsq(w.id)}')">${w.wall==="private"?"公開到許願牆":"不公開"}</button>`}</div>`;
+}
+function vWall(){
+  const rows=DB.board;
+  if(!S.boardAt&&!S.boardBusy&&!S.boardErr) setTimeout(loadBoard,0);   // 從深連結或第一次進來
+  return `<p class="tiny dim" style="margin:-2px 0 10px;line-height:1.7">
+      大家許過、店家審核過的願望。按「我也想要 +1」，想要的人越多越有機會開成喊單，開了會用 LINE 通知你。這裡不會顯示任何人的名字。</p>
+    <div class="chips inner" style="margin-bottom:12px">
+      <button class="chip ${S.boardSort==="hot"?"on":""}" onclick="setBS('hot')">🔥 最多人想要</button>
+      <button class="chip ${S.boardSort==="new"?"on":""}" onclick="setBS('new')">🕒 最新</button></div>
+    ${S.boardBusy&&!rows.length?`<div class="empty" style="padding:30px 10px"><span class="spin"></span><p>載入中…</p></div>`
+    :S.boardErr&&!rows.length?`<div class="empty" style="padding:30px 10px"><h3>許願牆暫時打不開</h3>
+        <button class="btn quiet" onclick="loadBoard(true)">再試一次</button></div>`
+    :rows.length?rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
+      <div class="row" style="align-items:flex-start">
+        ${b.img?`<img class="pv zoomable" src="${b.img}" alt="" onerror="imgExpired()" onclick="lightbox('img','${jsq(b.img)}','${jsq(b.title)}')">`:`<div class="ph">⭐</div>`}
+        <div style="flex:1;min-width:0">
+          <b style="font-size:14px;font-weight:700;line-height:1.45;display:block">${esc(b.title)}</b>
+          <div class="wants" style="margin-top:4px">🙋 ${b.wants} 人想要</div>
+          ${b.bc?`<div class="tiny dim" style="margin-top:2px">已開喊單・剩 ${b.bc.left} 份${b.bc.deadline?"・"+esc(b.bc.deadline)+" 截止":""}</div>`
+            :b.mine&&b.quote?`<div class="tiny dim" style="margin-top:2px">店家報價 NT$${nf(b.quote)} / 件</div>`:""}
+        </div></div>
+      <div style="margin-top:10px">
+        ${b.bc?`<button class="btn primary sm block" onclick="wallShout('${jsq(b.id)}')">NT$${nf(b.bc.p)} 去搶</button>`
+        :b.mine?`<div class="tiny dim" style="text-align:center;padding:7px 0;border:1px dashed var(--line);border-radius:9px">⭐ 我許的</div>`
+        :`<button class="btn ${b.voted?"quiet":"primary"} sm block" onclick="wishPlus('${jsq(b.id)}')">${b.voted?"✓ 已 +1，再按取消":"🙋 我也想要 +1"}</button>`}
+      </div></div>`).join("")
+    :`<div class="empty" style="padding:30px 10px"><div style="font-size:36px">🌱</div>
+        <h3>許願牆還是空的</h3><p>許願時勾「公開到許願牆」，店家看過就會出現在這裡。</p>
+        <button class="btn primary" onclick="setWV('mine')">去許願</button></div>`}
+    <p class="tiny dim" style="text-align:center;margin:6px 0 8px">+1 不是下單，也不保留名額；開成喊單後一樣先搶先贏</p>`;
+}
 function vWish(){
   return `<div class="wrap">
+    <div class="seg" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <button class="${S.wishView!=="wall"?"on":""}" onclick="setWV('mine')">⭐ 我的許願 ${DB.wishes.length}</button>
+      <button class="${S.wishView==="wall"?"on":""}" onclick="setWV('wall')">🙋 許願牆</button></div>
+    ${S.wishView==="wall"?vWall():vWishMine()}</div>`;
+}
+function vWishMine(){
+  return `
     <div class="h2">許願清單</div>
     <p class="tiny dim" style="margin:-4px 0 12px;line-height:1.7">
       本次沒有的商品，把照片、連結或文字丟進來。系統會先辨識，小幫手在日本現場幫你找，找到後回報價格。</p>
@@ -2136,10 +2272,14 @@ function vWish(){
         ${w.st==="nostock"?`<div class="row" style="margin-top:10px">
           <button class="btn quiet sm" style="flex:1" onclick="wishKeep('${w.id}')">保留到下一團</button>
           <button class="btn danger sm" onclick="wishDrop('${w.id}')">刪除</button></div>`:""}
+        ${wishWallLine(w)}
       </div>`;}).join("")
     :`<div class="empty" style="padding:30px 10px"><div style="font-size:36px">⭐</div>
         <h3>還沒有許願紀錄</h3><p>用上面三個按鈕，把想要的商品丟進來。</p></div>`}
-    <p class="tiny dim" style="text-align:center;margin:6px 0 8px">許願不代表保留名額，以小幫手現場實際採購為準</p></div>`;
+    <p class="tiny dim" style="text-align:center;margin:6px 0 8px">許願不代表保留名額，以小幫手現場實際採購為準</p>
+    <button class="ecard" style="width:100%;flex-direction:row;align-items:center;gap:12px;margin-bottom:8px" onclick="setWV('wall')">
+      <span style="font-size:24px">🙋</span><span style="text-align:left;flex:1"><b class="sm">看看大家許了什麼</b>
+      <span class="tiny dim" style="display:block">別人想要的你也想要？按 +1 一起許</span></span><span class="dim">›</span></button>`;
 }
 function vOrders(){
   const live=DB.orders.filter(o=>!o.exception&&o.st<4), done=DB.orders.filter(o=>o.exception||o.st>=4);
