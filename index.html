@@ -1016,6 +1016,7 @@ async function boot(){
   document.body.classList.remove("guest");
   const nav=$(".tabs"); if(nav) nav.style.display="";   // 從維護或載入失敗畫面恢復
   render();
+  if(!(S.tab==="wish"&&S.wishView==="wall")) preloadBoard();   // 首頁許願牆入口要顯示則數
 }
 var wait = ms => new Promise(r=>setTimeout(r,ms));
 
@@ -1653,6 +1654,7 @@ function setWV(v){ S.wishView=v; if(v==="wall") loadBoard(); else render(); }
 function setBS(v){ S.boardSort=v; loadBoard(true); }
 /* 30 秒內切回來不重拉；force 用在換排序、照片過期 */
 async function loadBoard(force){
+  if(S.boardBusy) return;                        // 已經在拉了，不重複打
   if(!force&&S.boardAt&&Date.now()-S.boardAt<30000) return render();
   S.boardBusy=true; render();
   try{ DB.board=(await API.wishBoard(S.boardSort)||[]).map(M.board); S.boardAt=Date.now(); S.boardErr=false; }
@@ -1687,6 +1689,45 @@ function wishShare(id){
   toast(pub?"已送出，店家看過就會放上許願牆":"已從許願牆收回，之前的 +1 會保留");
   API.wishShare(id,pub).then(r=>{ if(r&&r.wall_status){ w.wall=r.wall_status; if(typeof r.votes==="number") w.votes=r.votes; render(); } })
     .catch(e=>{ w.wall=e.code==="HIDDEN_BY_SHOP"?"hidden":prev; render(); });
+}
+/* 牆上看得懂的卡片：沒照片又只叫「照片許願」的，別人看不出是什麼，不顯示（自己的照樣顯示） */
+function wallRows(){ return DB.board.filter(b=>b.mine||b.img||b.title!=="照片許願"); }
+function openWall(){ S.wishView="wall"; go("wish"); loadBoard(); }
+function homeWallCard(){
+  const rows=wallRows(), top=rows.filter(b=>!b.mine)[0];
+  return `<button class="ecard" style="width:100%;margin-top:11px;flex-direction:row;align-items:center;gap:12px" onclick="openWall()">
+      <em style="margin:0">🙋</em>
+      <span style="flex:1;min-width:0"><b style="display:block">許願牆${rows.length?`<span class="tiny dim" style="font-weight:400;margin-left:6px">${rows.length} 則</span>`:""}</b>
+        <span>${top?`🔥 ${esc(top.title)}・${top.wants} 人想要`:"大家想要的日本好物，按 +1 一起許，人多就開喊單"}</span></span>
+      <span class="ar dim" style="font-size:17px">›</span></button>`;
+}
+/* 開機後在背景拉一次許願牆，首頁入口才有則數；失敗不提示 */
+function preloadBoard(){
+  req("/wishes/board?sort=hot",{retry:0}).then(r=>{ if(!S.boardAt){ DB.board=(r||[]).map(M.board); S.boardAt=Date.now(); render(); } }).catch(()=>{});
+}
+function wallShareUrl(){ return "https://liff.line.me/"+CFG.liffId+"?path=wall"; }
+/* 找朋友 +1：LINE 分享選單 → 手機分享選單 → 複製文字 */
+async function shareWish(id){
+  const b=DB.board.find(x=>x.id===id)||{}, w=DB.wishes.find(x=>x.id===id)||{};
+  const name=b.title||w.title;
+  const text=name&&name!=="照片許願"
+    ?`我在 HEEEHABABY 許願牆許了「${name}」🙋\n你也想要的話幫我按 +1，人夠多店家就會從日本帶回來 👇`
+    :`HEEEHABABY 許願牆：大家想要的日本好物，按 +1 人夠多店家就會從日本帶回來 🙋 👇`;
+  const url=wallShareUrl();
+  let pick=false;
+  try{ pick = !CFG.mock && ENV.sdk && liff.isApiAvailable("shareTargetPicker"); }catch(_){}
+  if(pick){
+    try{ const r=await liff.shareTargetPicker([{ type:"text", text:text+"\n"+url }]);
+      toast(r?"已分享，朋友按 +1 你會在「我的許願」看到人數":"已取消分享",2600); }
+    catch(e){ toast("分享失敗，請稍後再試"); }
+    return;
+  }
+  if(navigator.share){
+    try{ await navigator.share({ title:"HEEEHABABY 許願牆", text, url }); toast("已分享",2000); }
+    catch(e){ if(e&&e.name!=="AbortError") toast("分享失敗，請稍後再試"); }
+    return;
+  }
+  copyText(text+"\n"+url,"分享文字");
 }
 function goBroadcast(no){
   if(DB.broadcast.find(x=>x.no===no&&x.left>0)) return go("live");
@@ -1903,6 +1944,7 @@ function vHome(){
       <span style="flex:1"><b style="display:block">許願代找</b>
         <span>不確定日本有沒有貨？寫下來，小幫手到現場幫你找</span></span>
       <span class="ar dim" style="font-size:17px">›</span></button>
+    ${homeWallCard()}
 
     <div class="h2">價目表</div>
     <details class="fold" ${S.open.has("pt")?"open":""} ontoggle="fold('pt',this.open)">
@@ -2198,21 +2240,29 @@ const WALL={private:null,pending:{t:"等店家審核",c:"gold"},public:{t:"在�
 function wishWallLine(w){
   if(w.bcNo) return `<button class="btn primary sm block" style="margin-top:10px" onclick="goBroadcast('${jsq(w.bcNo)}')">🙌 已開喊單 ${esc(w.bcNo)}，去搶 →</button>`;
   if(["converted"].indexOf(w.st)>=0) return "";
-  const s=WALL[w.wall];
+  const s=WALL[w.wall], noPic=!w.img;
   return `<div class="between" style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)">
     <div class="tiny" style="min-width:0">
       ${s?`<span class="pill ${s.c}" style="font-size:11px">${s.t}</span>`:`<span class="dim">只有你看得到</span>`}
       ${w.votes>0?`<span class="wants" style="margin-left:6px">🙋 還有 ${w.votes} 人也想要</span>`:""}</div>
-    ${w.wall==="hidden"?"":`<button class="btn quiet sm" style="flex:none" onclick="wishShare('${jsq(w.id)}')">${w.wall==="private"?"公開到許願牆":"不公開"}</button>`}</div>`;
+    <div class="row" style="gap:6px;flex:none">
+    ${w.wall==="public"&&!(noPic&&w.title==="照片許願")?`<button class="btn quiet sm" onclick="shareWish('${jsq(w.id)}')">📤 找朋友</button>`:""}
+    ${w.wall==="hidden"?"":`<button class="btn quiet sm" onclick="wishShare('${jsq(w.id)}')">${w.wall==="private"?"公開到許願牆":"不公開"}</button>`}</div></div>
+    ${w.wall!=="private"&&w.wall!=="hidden"&&w.title==="照片許願"?`<div class="tiny dim" style="margin-top:6px;line-height:1.6">
+      ${noPic?"⚠️ 這則是舊的許願，系統沒有存到照片，放上牆別人看不出是什麼。建議重新用「傳照片」許一次。"
+        :"店家放上牆時會補上品名，其他人才知道是什麼商品。"}</div>`:""}`;
 }
 function vWall(){
-  const rows=DB.board;
+  const rows=wallRows(), others=rows.filter(b=>!b.mine).length, mineOn=rows.find(b=>b.mine);
   if(!S.boardAt&&!S.boardBusy&&!S.boardErr) setTimeout(loadBoard,0);   // 從深連結或第一次進來
   return `<p class="tiny dim" style="margin:-2px 0 10px;line-height:1.7">
       大家許過、店家審核過的願望。按「我也想要 +1」，想要的人越多越有機會開成喊單，開了會用 LINE 通知你。這裡不會顯示任何人的名字。</p>
     <div class="chips inner" style="margin-bottom:12px">
       <button class="chip ${S.boardSort==="hot"?"on":""}" onclick="setBS('hot')">🔥 最多人想要</button>
       <button class="chip ${S.boardSort==="new"?"on":""}" onclick="setBS('new')">🕒 最新</button></div>
+    ${mineOn&&!others?`<div class="alert pine" style="margin:0 0 12px;line-height:1.7">
+      <b>牆上目前只有你的許願</b><br><span class="tiny">分享給有小孩的朋友，請他們按 +1，想要的人越多越快開喊單。</span>
+      <button class="btn primary sm block" style="margin-top:9px" onclick="shareWish('${jsq(mineOn.id)}')">📤 找朋友一起 +1</button></div>`:""}
     ${S.boardBusy&&!rows.length?`<div class="empty" style="padding:30px 10px"><span class="spin"></span><p>載入中…</p></div>`
     :S.boardErr&&!rows.length?`<div class="empty" style="padding:30px 10px"><h3>許願牆暫時打不開</h3>
         <button class="btn quiet" onclick="loadBoard(true)">再試一次</button></div>`
@@ -2227,7 +2277,8 @@ function vWall(){
         </div></div>
       <div style="margin-top:10px">
         ${b.bc?`<button class="btn primary sm block" onclick="wallShout('${jsq(b.id)}')">NT$${nf(b.bc.p)} 去搶</button>`
-        :b.mine?`<div class="tiny dim" style="text-align:center;padding:7px 0;border:1px dashed var(--line);border-radius:9px">⭐ 我許的</div>`
+        :b.mine?`<div class="row" style="gap:8px"><div class="tiny dim" style="flex:1;text-align:center;padding:7px 0;border:1px dashed var(--line);border-radius:9px">⭐ 我許的</div>
+            <button class="btn quiet sm" style="flex:none" onclick="shareWish('${jsq(b.id)}')">📤 找朋友 +1</button></div>`
         :`<button class="btn ${b.voted?"quiet":"primary"} sm block" onclick="wishPlus('${jsq(b.id)}')">${b.voted?"✓ 已 +1，再按取消":"🙋 我也想要 +1"}</button>`}
       </div></div>`).join("")
     :`<div class="empty" style="padding:30px 10px"><div style="font-size:36px">🌱</div>
