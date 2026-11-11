@@ -2289,8 +2289,8 @@ function vWall(){
 function vWish(){
   return `<div class="wrap">
     <div class="seg" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
-      <button class="${S.wishView!=="wall"?"on":""}" onclick="setWV('mine')">⭐ 我的許願 ${DB.wishes.length}</button>
-      <button class="${S.wishView==="wall"?"on":""}" onclick="setWV('wall')">🙋 許願牆</button></div>
+      <button class="${S.wishView!=="wall"?"on":""}" onclick="setWV('mine')">⭐ 我的許願 (${DB.wishes.length})</button>
+      <button class="${S.wishView==="wall"?"on":""}" onclick="setWV('wall')">🙋 許願牆${S.boardAt?` (${wallRows().length})`:""}</button></div>
     ${S.wishView==="wall"?vWall():vWishMine()}</div>`;
 }
 function vWishMine(){
