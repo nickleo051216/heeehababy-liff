@@ -428,7 +428,7 @@ body.guest .tabs,body.guest .topbar .iconbtn{display:none!important}
    HEEEHABABY 買家前台（LINE LIFF）
    名詞與訂單狀態依系統規格：團 / 願望清單 / 拆單 / 狀態機
    ---------------------------------------------------------------------------
-   ★ 後端接點：見 japan-system 的 BUYER_API_CONTRACT.md（/api/v1/{resource}/{action}，27 個，含公開的 /health）
+   ★ 後端接點：見 japan-system 的 BUYER_API_CONTRACT.md v1.5.1（/api/v1/{resource}/{action}，27 個，含公開的 /health）
      前端不直連資料庫、不持有金鑰；身分一律送 LIFF ID token，由後端驗證。
      本前台獨立部署於 japan-front-end-system，/api/v1/* 由 vercel.json 反向代理到後端，
      瀏覽器看到的是同網域，不需要 CORS。
@@ -2249,7 +2249,7 @@ function wishWallLine(w){
     ${w.wall==="public"&&!(noPic&&w.title==="照片許願")?`<button class="btn quiet sm" onclick="shareWish('${jsq(w.id)}')">📤 找朋友</button>`:""}
     ${w.wall==="hidden"?"":`<button class="btn quiet sm" onclick="wishShare('${jsq(w.id)}')">${w.wall==="private"?"公開到許願牆":"不公開"}</button>`}</div></div>
     ${w.wall!=="private"&&w.wall!=="hidden"&&w.title==="照片許願"?`<div class="tiny dim" style="margin-top:6px;line-height:1.6">
-      ${noPic?"⚠️ 這則是舊的許願，系統沒有存到照片，放上牆別人看不出是什麼。建議重新用「傳照片」許一次。"
+      ${noPic?"這則沒有照片，店家補上品名後才會放上許願牆。"
         :"店家放上牆時會補上品名，其他人才知道是什麼商品。"}</div>`:""}`;
 }
 function vWall(){
