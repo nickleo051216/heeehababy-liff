@@ -1567,7 +1567,7 @@ function tracking(oid,idx){
 }
 
 /* ---------- 許願 ---------- */
-var WST={parsing:{t:"解析中",c:"grey",d:"正在辨識商品，稍後由小幫手確認供貨"},
+var WST={parsing:{t:"等小幫手確認",c:"grey",d:"小幫手會到日本現場確認有沒有貨和價格"},
  quoted:{t:"已報價",c:"gold",d:"確認後即轉為訂單，名額於付款後保留"},
  nostock:{t:"現場缺貨",c:"beni",d:"本次現場未找到"},
  kept:{t:"保留下團",c:"pine",d:"下團開團時會在 LINE 群組公告"},
@@ -1576,7 +1576,9 @@ var _wishImg=null;
 function wishForm(kind,pre){
   const f={photo:`<label class="drop" style="display:block;cursor:pointer">
       <b>選擇商品照片</b><div class="tiny dim">截圖、型錄、包裝照都可以<br>JPG／PNG／HEIC・單張 10MB 以內</div>
-      <input type="file" accept="image/*" style="display:none" onchange="wishPhoto(event)"></label><div id="wpv"></div>`,
+      <input type="file" accept="image/*" style="display:none" onchange="wishPhoto(event)"></label><div id="wpv"></div>
+    <div class="field" style="margin-top:12px"><label>商品名稱（選填）</label>
+      <input id="wname" maxlength="60" placeholder="例：麵包超人 泡泡棒　知道就填，店家比較好找"></div>`,
     link:`<div class="field"><label>商品連結</label>
       <input id="wsrc" placeholder="https://item.rakuten.co.jp/..." inputmode="url"></div>`,
     text:`<div class="field"><label>商品描述</label>
@@ -1588,7 +1590,7 @@ function wishForm(kind,pre){
     <label class="pubchk"><input type="checkbox" id="wpub">
       <span><b class="sm">公開到許願牆，讓大家一起 +1</b>
       <span class="tiny dim" style="display:block;line-height:1.6;margin-top:2px">店家看過才會公開，不會顯示你的名字和備註。想要的人越多，越有機會開成喊單。</span></span></label>
-    <p class="tiny dim" style="line-height:1.7">送出後會先辨識商品，再由日本現場的小幫手確認供貨與價格。許願不等於保留名額。</p>`,
+    <p class="tiny dim" style="line-height:1.7">送出後由日本現場的小幫手確認供貨與價格。許願不等於保留名額。</p>`,
    `<button class="btn primary block" onclick="submitWish('${kind}')">送出許願</button>`);
 }
 var _wishFile=null, _wishRaw=null;
@@ -1602,7 +1604,7 @@ function wishPhoto(ev){
       <img class="zoomable" src="${_wishImg}" onclick="lightbox('img',this.src,'許願圖片')"
         style="width:70px;height:70px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
       <div class="sm" style="min-width:0"><b>已選擇</b>
-        <div class="tiny dim">送出後開始辨識</div></div></div>
+        <div class="tiny dim">知道名稱的話，下面填一下更好找</div></div></div>
       ${upInfo("wish",f,_wishFile)}`;};
   r.readAsDataURL(f);
 }
@@ -1611,8 +1613,9 @@ async function submitWish(kind){
   if(!src){toast(kind==="photo"?"請先選擇一張照片":"請先填寫內容");return;}
   if(kind==="link"&&!/^https?:\/\//.test(src)){toast("請貼上完整網址，需以 http(s):// 開頭");return;}
   const q=Math.max(1,parseInt($("#wq").value||"1",10)),note=$("#wn").value.trim(),pub=!!($("#wpub")&&$("#wpub").checked);
+  const pname=kind==="photo"&&$("#wname")?$("#wname").value.trim().slice(0,60):"";
   const w={id:"W-"+(105+DB.wishes.length),src:{photo:"照片",link:"連結",text:"文字"}[kind],
-    title:kind==="link"?"辨識中的商品連結":kind==="text"?src.slice(0,28):"辨識中的商品照片",
+    title:kind==="link"?"商品連結":kind==="text"?src.slice(0,28):(pname||"照片許願"),
     raw:src,note,qty:q,st:"parsing",at:now().split(" ")[0],img:kind==="photo"?_wishImg:null,
     file:kind==="photo"?_wishFile:null,wall:pub?"pending":"private",votes:0,bcNo:null};
   let data=kind==="photo"?w.img:undefined;
@@ -1622,14 +1625,14 @@ async function submitWish(kind){
   }
   DB.wishes.unshift(w);_wishImg=null;_wishFile=null;_wishRaw=null;closeSheet();go("wish");
   toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後可以在「許願」頁查看",2600);
-  API.wishCreate({src:kind,item_name:kind==="text"?src:undefined,ref_url:kind==="link"?src:undefined,
+  API.wishCreate({src:kind,item_name:kind==="text"?src:(pname||undefined),ref_url:kind==="link"?src:undefined,
       quantity:q,note,file_name:w.file,data,public:pub||undefined})
     .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock){ w.title=r.item_name; if(r.wall_status) w.wall=r.wall_status; if(r.picture) w.img=r.picture; } } })
     .catch(()=>{ DB.wishes=DB.wishes.filter(x=>x!==w); render(); });
   if(!CFG.mock) return;                             // 正式模式由店家在後台報價，不模擬
   await wait(4000);
   const guess=["日本限定 貝親 寬口奶瓶配件組","西松屋 純棉包巾 兩入","和光堂 嬰兒米精 袋裝","Richell 吸管訓練杯 200ml"];
-  w.title=kind==="text"?src:guess[Math.floor(Math.random()*guess.length)];
+  w.title=kind==="text"?src:(pname||guess[Math.floor(Math.random()*guess.length)]);
   w.st="quoted";w.quote=Math.round((380+Math.random()*1600)/10)*10;
   syncBadge();if(S.tab==="wish")render();
   toast(`${w.id} 已完成報價：NT$${nf(w.quote)} / 件`,2800);
@@ -1896,7 +1899,11 @@ function vHome(){
       <span><b>有包裹可以取貨了</b><br><span class="tiny" style="opacity:.85">請於到店後 7 日內取件</span></span>
       <span class="ar">›</span></button>`:""}
 
-    <section class="trip">
+    ${!TRIP.code?`<section class="trip" data-trip="none" style="padding:16px 18px">
+      <div class="code">本次採買行程</div>
+      <div style="font-weight:700;font-size:15px;margin-top:4px">目前沒有開放中的團</div>
+      <div class="sub" style="margin-top:2px">下一團開放時會在聊天室通知；沒有團的時候也可以許願，或直接拍照下單</div>
+    </section>`:`<section class="trip" data-trip="open">
       <div class="code">本次採買行程　${TRIP.code}</div>
       <h1>${TRIP.name}</h1>
       <div class="sub">${TRIP.region}・實體店面現場採買</div>
@@ -1913,7 +1920,7 @@ function vHome(){
       <button class="sharebtn" onclick="shareTrip()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
         把這團分享給朋友</button>
-    </section>
+    </section>`}
 
     ${openBC.length?`
     <div class="h2">📣 現場連線喊單 <span class="pill beni" style="margin-left:4px">進行中</span></div>
@@ -2297,7 +2304,7 @@ function vWishMine(){
   return `
     <div class="h2">許願清單</div>
     <p class="tiny dim" style="margin:-4px 0 12px;line-height:1.7">
-      本次沒有的商品，把照片、連結或文字丟進來。系統會先辨識，小幫手在日本現場幫你找，找到後回報價格。</p>
+      本次沒有的商品，把照片、連結或文字丟進來。小幫手在日本現場幫你找，找到後回報價格。</p>
     <div class="wishbar">
       <button class="wishbtn" onclick="wishForm('photo')"><em>📷</em>傳照片</button>
       <button class="wishbtn" onclick="wishForm('link')"><em>🔗</em>貼連結</button>
@@ -2310,7 +2317,7 @@ function vWishMine(){
           <div style="flex:1;min-width:0">
             <div class="oid">${w.id}・${w.src}提交・${w.at}</div>
             <b style="font-size:14px;font-weight:700;line-height:1.45;display:block;margin-top:2px">
-              ${w.st==="parsing"?`<span class="spin"></span> `:""}${esc(w.title)}</b>
+              ${w.st==="parsing"&&CFG.mock?`<span class="spin"></span> `:""}${esc(w.title)}</b>
             ${w.note?`<div class="tiny dim">備註：${esc(w.note)}</div>`:""}
             <div class="tiny dim">數量 ${w.qty}</div></div>
           <span class="pill ${s.c}" style="flex:none">${s.t}</span></div>
