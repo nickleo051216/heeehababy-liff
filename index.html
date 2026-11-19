@@ -610,7 +610,8 @@ var INV_ST = { pending:{t:"待開立",c:"grey"}, issued:{t:"已開立",c:"pine"}
                void:{t:"已作廢",c:"beni"}, allowance:{t:"已折讓",c:"gold"} };
 
 var SHOP = { name:"HEEEHABABY", bankName:"華南銀行", bankCode:"008", bankHolder:"",
-             bankAccount:"000000000000", payDeadlineDays:2 };
+             bankAccount:"000000000000", payDeadlineDays:2,
+             showTrip:null };   // 首頁團卡：true 一律顯示、false 一律隱藏、null 依有沒有開團自動（合約 v1.5.2）
 var FX = { cvs:70, home:120 };
 /* 滿額免運門檻（台幣），null = 這種取貨方式沒有免運。看單張訂單的商品小計（不含運費），
    還沒定價的品項以 0 計；實收運費以結帳回傳的 ship_fee_twd 為準（合約 v1.3） */
@@ -1064,6 +1065,7 @@ async function boot(){
         closeAt:new Date(0),buyAt:"—",backAt:"—",shipAt:"—",joined:0,orders:0,stage:0};
       if(home.shop.ship_fee) Object.assign(FX,home.shop.ship_fee);   // 運費以後台設定為準
       if(home.shop.ship_free) Object.assign(SHIP_FREE,home.shop.ship_free);
+      SHOP.showTrip = typeof home.shop.show_trip_card==="boolean" ? home.shop.show_trip_card : null;
       PRICE_TABLE=home.price_table.map(r=>[r.jpy_taxed_max,r.twd]);
       Object.assign(SHOP,{name:home.shop.name,bankName:home.shop.bank_name,bankCode:home.shop.bank_code,
         bankAccount:home.shop.bank_account,bankHolder:home.shop.bank_holder||"",payDeadlineDays:home.shop.payment_deadline_days});
@@ -1969,7 +1971,7 @@ function vHome(){
       <span><b>有包裹可以取貨了</b><br><span class="tiny" style="opacity:.85">請於到店後 7 日內取件</span></span>
       <span class="ar">›</span></button>`:""}
 
-    ${!TRIP.code?`<section class="trip" data-trip="none" style="padding:16px 18px">
+    ${SHOP.showTrip===false?"":!TRIP.code?`<section class="trip" data-trip="none" style="padding:16px 18px">
       <div class="code">本次採買行程</div>
       <div style="font-weight:700;font-size:15px;margin-top:4px">目前沒有開放中的團</div>
       <div class="sub" style="margin-top:2px">下一團開放時會在聊天室通知；沒有團的時候也可以許願，或直接拍照下單</div>
