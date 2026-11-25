@@ -959,8 +959,16 @@ function mockV16(path,body){
       throw new ApiErr("ALREADY_REQUESTED","這張訂單已經有審核中的申請",{status:409});
     let oids=ids.slice();
     if(body.ship_to_order_id){ oids=[body.ship_to_order_id].concat(oids.filter(x=>x!==body.ship_to_order_id)); }
+    let pickup=null, pickup_text=null;
+    if(body.pickup){
+      if(["cvs","home"].indexOf(body.pickup.type)<0) throw new ApiErr("BAD_PICKUP","寄送方式只能選超商或宅配",{status:400});
+      if(body.pickup.type==="home"){ if(!DB.me.addr) throw new ApiErr("PICKUP_INCOMPLETE","還沒有宅配地址，請先到「我的」設定",{status:400});
+        pickup={type:"home",addr:DB.me.addr,from_default:true}; pickup_text="宅配到府 "+DB.me.addr; }
+      else { if(!DB.me.pickup) throw new ApiErr("PICKUP_INCOMPLETE","還沒有取貨門市，請先到「我的」設定",{status:400});
+        pickup={type:"cvs",brand:"",store_id:DB.me.pickupId||"",store_name:DB.me.pickup,addr:DB.me.pickupAddr||"",from_default:true}; pickup_text="超商取貨 "+DB.me.pickup; }
+    }
     const r={request_id:"SR-"+String(1000+R.length+1),kind:body.kind,kind_zh:body.kind==="merge"?"併單":"拆單",status:"pending",status_zh:"審核中",
-      order_ids:oids,item_ids:body.item_ids||[],note:body.note||"",decision_note:"",created_at:new Date().toISOString(),decided_at:null,ship_group:null};
+      order_ids:oids,item_ids:body.item_ids||[],note:body.note||"",decision_note:"",created_at:new Date().toISOString(),decided_at:null,ship_group:null,pickup,pickup_text};
     R.unshift(r); return r;
   }
   if(path.indexOf("/inbox/list")===0) return {items:DB.inbox.slice(),unread:DB.inbox.filter(x=>!x.read).length,next_before:null};
@@ -2827,6 +2835,7 @@ function reqCard(r){
     <div class="between"><b class="sm">${esc(r.kind_zh||"")}申請</b><span class="pill ${REQ_PILL[r.status]||"grey"}">${esc(r.status_zh||r.status)}</span></div>
     <div class="tiny dim" style="margin-top:3px;line-height:1.7">${esc(r.request_id)}・${fmtTs(r.created_at)} 送出<br>
       訂單：${r.order_ids.map(esc).join("、")}${r.kind==="split"&&r.item_ids&&r.item_ids.length?`（先寄 ${r.item_ids.length} 項）`:""}
+      ${r.pickup_text?`<br>寄到：${esc(r.pickup_text)}`:""}
       ${r.note?`<br>備註：${esc(r.note)}`:""}</div>
     ${r.decision_note?`<div class="tiny" style="margin-top:5px;color:var(--title)">店家回覆：${esc(r.decision_note)}</div>`:""}
     ${g?`<div class="tiny" style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);line-height:1.8">
@@ -2868,25 +2877,32 @@ function shipStart(kind){
     <p class="tiny dim" style="line-height:1.7">先寄的部分會另外算一次運費（超商 NT$${nf(FX.cvs)}／宅配 NT$${nf(FX.home)}）；母單已付款或已出對帳單就不另收。以店家確認為準。</p>`,
     `<button class="btn primary block" onclick="shipSubmit('split','${o.id}')">送出拆單申請</button>`);
 }
-/* 寄送方式：合約 30 沒有收寄送方式欄位，跟訂單不同時寫進備註讓店家看（見交接「需後端配合」） */
+/* 寄送方式（合約 30，後端 021）：跟訂單一樣就不帶 pickup（沿用原本的）；
+   改了才帶 { type }，後端會用會員資料的預設門市／宅配地址（跟結帳同一套） */
 function shipWayField(o){
   const t=pickType(o);
   return `<div class="h2" style="margin:14px 0 6px">寄送方式</div>
     <div class="seg" style="grid-template-columns:1fr 1fr">
       <button type="button" class="${t==="cvs"?"on":""}" data-way="cvs" onclick="shipWay(this)">超商取貨</button>
       <button type="button" class="${t==="home"?"on":""}" data-way="home" onclick="shipWay(this)">宅配到府</button></div>
-    <input type="hidden" id="shipway" value="${t}" data-orig="${t}">`;
+    <input type="hidden" id="shipway" value="${t}" data-orig="${t}">
+    <div class="tiny dim" id="shipwayhint" style="margin-top:6px;line-height:1.7">${shipWayHint(t,t)}</div>`;
 }
-function shipWay(btn){ btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b===btn)); $("#shipway").value=btn.dataset.way; }
+function shipWayHint(way,orig){
+  const dest=way==="home"?(DB.me.addr?`宅配到府・${esc(DB.me.addr)}`:"宅配到府・還沒有設定地址")
+                         :(DB.me.pickup?`超商取貨・${esc(DB.me.pickup)}`:"超商取貨・還沒有設定門市");
+  if(way===orig) return "照訂單原本的寄送方式寄出";
+  return `改成 <b>${dest}</b>（用「我的」裡的預設資料，要換請先到「我的」修改）<br>
+    <span style="color:var(--beni)">換了寄送方式，運費可能不同，店家核准後會用 LINE 通知你實際金額</span>`;
+}
+function shipWay(btn){ btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b===btn));
+  const w=$("#shipway"); w.value=btn.dataset.way; const h=$("#shipwayhint"); if(h) h.innerHTML=shipWayHint(w.value,w.dataset.orig); }
 async function shipSubmit(kind,oid){
   const way=$("#shipway"), noteEl=$("#shipnote");
   let note=(noteEl&&noteEl.value||"").trim();
   const shipTo=kind==="merge"?(document.querySelector("input[name=shipto]:checked")||{}).value:null;
   const base=kind==="merge"?DB.orders.find(o=>o.id===shipTo):DB.orders.find(o=>o.id===oid);
-  if(way&&base&&way.value!==pickType(base)){
-    const want=way.value==="home"?`希望改宅配到府（${DB.me.addr||"地址請小幫手跟我確認"}）`:`希望改超商取貨（${DB.me.pickup||"門市請小幫手跟我確認"}）`;
-    note=want+(note?"；"+note:"");
-  }
+  const pickup=way&&base&&way.value!==pickType(base)?{type:way.value}:null;
   let body;
   if(kind==="merge") body={kind:"merge",order_ids:[...S.shipSel].filter(id=>DB.orders.some(o=>o.id===id&&canMerge(o))),ship_to_order_id:shipTo,note};
   else {
@@ -2896,13 +2912,21 @@ async function shipSubmit(kind,oid){
     if(ids.every(Boolean)) body.item_ids=ids;
   }
   if(!body.note) delete body.note;
+  if(pickup) body.pickup=pickup;
   try{
     const r=await API.shipCreate(body);
     DB.shipReqs=[r].concat((DB.shipReqs||[]).filter(x=>x.request_id!==r.request_id));
     S.shipSel=new Set(); closeSheet(); render();
     toast(`已送出${r.kind_zh||""}申請，店家確認後會通知你`,2600);
     if(!CFG.mock){ try{ DB.shipReqs=await API.shipList(); render(); }catch(_){} }
-  }catch(e){ /* call() 已顯示後端的 error.message */ }
+  }catch(e){
+    /* call() 已顯示後端的 error.message；缺門市／地址時多給一顆按鈕去補 */
+    if(e&&e.code==="PICKUP_INCOMPLETE"){
+      const h=$("#shipwayhint");
+      if(h) h.innerHTML=`<span style="color:var(--beni)">${esc(e.message)}</span><br>
+        <button type="button" class="btn quiet sm" style="margin-top:6px" onclick="closeSheet();go('me')">去「我的」設定門市／地址</button>`;
+    }
+  }
 }
 async function shipCancel(id){
   try{
