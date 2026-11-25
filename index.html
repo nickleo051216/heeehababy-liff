@@ -505,6 +505,39 @@ box-shadow:0 4px 0 #D9A93F,0 8px 16px rgba(86,80,66,.14)}
 .topbar .tab.wishtab{background:var(--butter);color:#4F3205}
 .ltgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+/* v1.6：每日連線多圖、尺寸、出貨申請、通知中心（2026-11-25） */
+.lphoto.collage{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:2px;background:#fff;padding:0;place-items:stretch}
+.lphoto.collage.n2{grid-template-rows:1fr}
+.lphoto.collage.n3 .ci:first-child{grid-row:span 2}
+.lphoto.collage .ci{overflow:hidden;min-height:0;cursor:zoom-in}
+.lphoto.collage .ci img{width:100%;height:100%;object-fit:cover;display:block}
+.lphoto .more{position:relative}
+.szbar{display:flex;flex-wrap:wrap;gap:5px}
+.szbar button{min-width:38px;padding:4px 9px;border-radius:99px;border:1px solid var(--line);background:#FFFDF8;font-size:12px;color:var(--title);font-weight:700}
+.szbar button.on{background:var(--pine);border-color:var(--pine);color:#fff}
+.ltile.closed .lphoto{filter:grayscale(.35);opacity:.85}
+.bellbtn .badge{min-width:17px;height:17px;font-size:10px}
+.shippanel{background:#FFFDF8;border:1px solid var(--line);border-radius:18px;padding:14px;margin:4px 0 14px}
+.shippanel h3{margin:0 0 4px;font-size:16px;color:var(--title)}
+.shipsel{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px dashed var(--line);cursor:pointer}
+.shipsel:last-of-type{border-bottom:none}
+.shipsel input{width:20px;height:20px;flex:none;accent-color:var(--pine)}
+.shipsel .ph{width:38px;height:38px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;font-size:18px;flex:none}
+.shipcards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.shipcard{text-align:left;border-radius:16px;padding:14px 12px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);min-height:128px}
+.shipcard.merge{background:#EEF3F1}
+.shipcard.split{background:#FBEDBF;border-color:#EBCF7A}
+.shipcard b{font-size:15px;color:var(--title)}
+.shipcard .go{margin-top:auto;font-weight:800;font-size:12.5px;color:var(--title)}
+.shipcard[aria-disabled=true]{opacity:.55}
+.shipnote{margin-top:12px;background:var(--peach);border-radius:12px;padding:9px 11px;font-size:12px;line-height:1.7;color:var(--title)}
+.sreq{border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:9px;background:#fff}
+.inrow{display:flex;gap:10px;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid var(--line-soft);background:none}
+.inrow .dot{width:8px;height:8px;border-radius:50%;background:var(--beni);flex:none;margin-top:7px}
+.inrow .dot.read{background:transparent}
+.inrow b{font-size:14px;color:var(--title)}
+.inrow.read b{font-weight:500;color:var(--ink-2)}
+@media(min-width:860px){.topbar .iconbtn.bellbtn{display:grid;order:8;margin-left:auto}.topbar .iconbtn.bellbtn+.cartbtn{margin-left:6px}}
 </style>
 </head>
 <body>
@@ -524,8 +557,9 @@ box-shadow:0 4px 0 #D9A93F,0 8px 16px rgba(86,80,66,.14)}
         <path d="M13.4 18.1q2.6 2.3 5.2 0" fill="none" stroke="#354332" stroke-width="1.2" stroke-linecap="round"/></svg>
       <span class="bname">heeehababy<small>LAUGH LIKE A BABY. LIVE LIKE A QUEEN.</small></span></div>
     <div class="spacer"></div>
-    <button class="iconbtn" onclick="go('me')" aria-label="通知與我的">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#565042" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button>
+    <button class="iconbtn bellbtn" onclick="openInbox()" aria-label="通知">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#565042" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+      <span class="badge" id="bellBadge" style="display:none">0</span></button>
     <button class="iconbtn cartbtn" data-t="cart" onclick="go('cart')" aria-label="購物車">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#565042" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
       <span class="badge" id="cartBadge" style="display:none">0</span></button>
@@ -760,7 +794,7 @@ var API={
   cartUpdate   : (b)=>P_("/cart/update",b,"修改品項"),
   cartSetQty   : (cid,qty)=>P_("/cart/set-qty",{cart_id:cid,qty},"修改數量"),
   cartRemove   : (cid)=>P_("/cart/remove",{cart_id:cid},"移除品項"),
-  shout        : (sendId,qty)=>P_("/broadcast/shout",{send_id:sendId,qty},"喊單"),
+  shout        : (sendId,qty,size)=>P_("/broadcast/shout",size?{send_id:sendId,qty,size}:{send_id:sendId,qty},"喊單"),
   waitlist     : (sendId,on)=>P_("/broadcast/waitlist",{send_id:sendId,on},"候補"),
   wishList     : ()=>G_("/wishes/list","載入許願"),
   wishCreate   : (b)=>P_("/wishes/create",b,"送出許願"),
@@ -772,7 +806,14 @@ var API={
   wishShare    : (id,pub)=>P_("/wishes/share",{wish_id:id,public:pub},"許願牆設定"),
   checkout     : (b)=>P_("/orders/checkout",b,"送出訂單"),
   orderList    : ()=>G_("/orders/list","載入訂單"),
-  splitRequest : (oid,on)=>P_("/orders/split-request",{order_id:oid,on},"申請先出貨"),
+  /* v1.6 出貨申請（併單／拆單）：舊的 /orders/split-request 不再使用 */
+  shipCreate   : (b)=>P_("/ship-requests/create",b,"送出寄送申請"),
+  shipList     : ()=>G_("/ship-requests/list","載入寄送申請"),
+  shipCancel   : (id)=>P_("/ship-requests/cancel",{request_id:id},"取消寄送申請"),
+  /* v1.6 站內通知中心 */
+  inboxList    : (before)=>G_("/inbox/list?limit=30"+(before?"&before="+encodeURIComponent(before):""),"載入通知"),
+  inboxRead    : (b)=>P_("/inbox/read",b,"標為已讀"),
+  staffJoin    : (code)=>P_("/staff/join",{code},"邀請碼"),
   received     : (oid)=>P_("/orders/received",{order_id:oid},"回報收到"),
   track        : (oid)=>G_("/shipments/track?order_id="+encodeURIComponent(oid),"查詢物流"),
   stmtList     : ()=>G_("/statements/list","載入對帳單"),
@@ -796,11 +837,15 @@ function fmtDue(iso){ return iso?fmtTs(iso)+" 前":"期限內"; }
 var M={
   batch:(b)=>({code:b.batch,name:b.name,region:b.region||"",closeAt:new Date(b.close_at),
     buyAt:b.buy_at||"",backAt:b.back_at||"",shipAt:b.ship_at||"",joined:b.joined||0,stage:b.stage||0}),
-  bc:(b)=>({day:b.deadline_at?ymdTW(b.deadline_at):"",no:b.send_id,n:b.name,e:"🛍️",jpy:b.jpy_taxed,p:b.price_twd,qty:b.quantity,left:b.remaining,
-    deadline:b.open?fmtTs(b.deadline_at):"已截止",note:b.note||"",at:"",hot:false,img:b.image_url||null}),
+  /* v1.6：照上架日期分組（listed_at，舊後端沒有時退回截止日）；images 最多 4 張；sizes 為 null 表示不用選 */
+  bc:(b)=>{ const closed=b.deadline_at?new Date(b.deadline_at)<=new Date():(!b.open&&b.remaining>0);
+    const imgs=(Array.isArray(b.images)&&b.images.length?b.images:(b.image_url?[b.image_url]:[])).slice(0,4);
+    return {day:b.listed_at?ymdTW(b.listed_at):b.deadline_at?ymdTW(b.deadline_at):"",no:b.send_id,n:b.name,e:"🛍️",jpy:b.jpy_taxed,p:b.price_twd,
+    qty:b.quantity,left:b.remaining,closed,deadline:closed?"已截止":(b.deadline_at?fmtTs(b.deadline_at):""),note:b.note||"",at:"",hot:false,
+    img:imgs[0]||null,imgs,sizes:Array.isArray(b.sizes)&&b.sizes.length?b.sizes.map(String):null}; },
   cart:(c)=>{ const src=c.source==="reorder"?"text":c.source;
     return {k:"S"+c.cart_id,cid:c.cart_id,src,ref:src==="broadcast"?c.ref:(c.ref||c.cart_id),n:c.name,nja:c.name_ja||"",
-      e:ICON[c.source]||"🛍️",p:c.price_twd,jpy:c.jpy_taxed,q:c.qty,max:99,conf:c.ai_confidence||"high",
+      e:ICON[c.source]||"🛍️",p:c.price_twd,jpy:c.jpy_taxed,q:c.qty,max:99,conf:c.ai_confidence||"high",size:c.size||null,
       st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done}; },
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
@@ -815,7 +860,8 @@ var M={
     (o.status_log||[]).forEach(x=>{ const i=OS.indexOf(x.to_status); if(i>=0) log[i]=fmtTs(x.ts); });
     return {id:o.order_id,trip:(TRIP&&TRIP.code===o.batch)?TRIP.name:(o.batch||""),date:fmtDate(o.created_at),
       st:st>=0?st:0,exception:st<0?o.status:null,pay:o.payment_status,split_shipped:!!o.split_shipped,stmt:o.statement_id,
-      items:(o.items||[]).map(i=>({n:i.name,q:i.qty,p:i.unit_price_twd||0,jpy:i.jpy_taxed||0,e:ICON[i.source]||"🛍️",ist:i.item_status,src:i.source})),
+      shipGroup:o.ship_group_id||null,parent:o.parent_order_id||null,
+      items:(o.items||[]).map(i=>({id:i.item_id||null,n:i.name,q:i.qty,p:i.unit_price_twd||0,jpy:i.jpy_taxed||0,e:ICON[i.source]||"🛍️",ist:i.item_status,src:i.source,size:i.size||null})),
       total:o.total_twd,ship:o.ship_fee_twd||0,pickup:o.pickup||"",pickupAddr:o.pickup_addr||"",inv:o.invoice||"",note:o.note||"",log,
       splits:(o.shipments||[]).length?o.shipments.map((sh,i,a)=>({no:a.length>1?`子單 ${i+1}／${a.length}`:"單批出貨",items:"全部品項",
         carrier:CARRIER_CODE[sh.carrier]||"cvs711",no2:sh.tracking_no,eta:sh.eta||"",step:4,trace:[]})):null}; },
@@ -842,6 +888,9 @@ async function mockApi(path,method,body){
   await wait(120);
   if(path==="/broadcast/shout"){
     const it=DB.broadcast.find(x=>x.no===body.send_id);
+    if(it&&it.closed) throw new ApiErr("DEADLINE_PASSED","已經截止了，可以排候補",{status:409});
+    if(it&&it.sizes&&!body.size) throw new ApiErr("SIZE_REQUIRED","請先選尺寸："+it.sizes.join("、"),{status:400});
+    if(it&&it.sizes&&it.sizes.indexOf(body.size)<0) throw new ApiErr("BAD_SIZE","沒有這個尺寸，可以選："+it.sizes.join("、"),{status:400});
     if(!it||it.left<=0) throw new ApiErr("SOLD_OUT","已經被搶完了",{status:409});
     const granted=Math.min(body.qty||1,it.left);
     return {granted,remaining:it.left-granted,rank:it.qty-it.left+granted,cart_item:null};
@@ -869,7 +918,42 @@ async function mockApi(path,method,body){
     if(w&&w.wall==="hidden"&&body.public) throw new ApiErr("HIDDEN_BY_SHOP","店家已經把這則收下來了",{status:409});
     return {wish_id:body.wish_id,wall_status:body.public?(w&&w.wall==="public"?"public":"pending"):"private",votes:w?w.votes:0};
   }
+  if(path.indexOf("/ship-requests/")===0||path.indexOf("/inbox/")===0||path==="/staff/join") return mockV16(path,body);
   if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops,drops_limit:DB.me.dropsLimit,shout_suspended:DB.me.drops>=DB.me.dropsLimit};
+  return {mock:true};
+}
+/* 示範模式：出貨申請、通知中心、邀請碼（形狀照合約 30～36） */
+function mockV16(path,body){
+  const R=DB.shipReqs;
+  if(path==="/ship-requests/list") return R.slice();
+  if(path==="/ship-requests/cancel"){
+    const r=R.find(x=>x.request_id===body.request_id);
+    if(!r||r.status!=="pending") throw new ApiErr("ALREADY_DECIDED","這筆申請已經處理過了",{status:409});
+    r.status="cancelled"; r.status_zh="已取消"; return r;
+  }
+  if(path==="/ship-requests/create"){
+    const ids=body.kind==="merge"?(body.order_ids||[]):[body.order_id];
+    if(body.kind==="merge"&&ids.length<2) throw new ApiErr("TOO_FEW_ORDERS","併單至少要選 2 張訂單",{status:400});
+    if(body.kind==="merge"&&ids.length>10) throw new ApiErr("TOO_MANY_ORDERS","一次最多併 10 張訂單",{status:400});
+    if(R.some(r=>r.status==="pending"&&r.order_ids.some(x=>ids.indexOf(x)>=0)))
+      throw new ApiErr("ALREADY_REQUESTED","這張訂單已經有審核中的申請",{status:409});
+    let oids=ids.slice();
+    if(body.ship_to_order_id){ oids=[body.ship_to_order_id].concat(oids.filter(x=>x!==body.ship_to_order_id)); }
+    const r={request_id:"SR-"+String(1000+R.length+1),kind:body.kind,kind_zh:body.kind==="merge"?"併單":"拆單",status:"pending",status_zh:"審核中",
+      order_ids:oids,item_ids:body.item_ids||[],note:body.note||"",decision_note:"",created_at:new Date().toISOString(),decided_at:null,ship_group:null};
+    R.unshift(r); return r;
+  }
+  if(path.indexOf("/inbox/list")===0) return {items:DB.inbox.slice(),unread:DB.inbox.filter(x=>!x.read).length,next_before:null};
+  if(path==="/inbox/unread-count") return {unread:DB.inbox.filter(x=>!x.read).length};
+  if(path==="/inbox/read"){
+    let n=0; DB.inbox.forEach(x=>{ if(!x.read&&(body.all||(body.notif_ids||[]).indexOf(x.notif_id)>=0)){ x.read=true; x.read_at=new Date().toISOString(); n++; } });
+    return {marked:n,unread:DB.inbox.filter(x=>!x.read).length};
+  }
+  if(path==="/staff/join"){
+    const c=String(body.code||"").replace(/[\s-]/g,"").toUpperCase();
+    if(c.length!==8) throw new ApiErr("INVITE_INVALID","邀請碼不對，請再確認一次",{status:400});
+    return {role:"helper",role_zh:"小幫手",nickname:DB.me.nickname,member_no:DB.me.memberNo,next:"請用同一個 LINE 帳號登入後台"};
+  }
   return {mock:true};
 }
 function mockInvoice(){ return {st:"issued",no:"AB-"+Math.floor(1e7+Math.random()*9e7),date:now(),carrier:DB.me.carrier}; }
@@ -1040,6 +1124,7 @@ function routeDeepLink(){
   if(path==="orders"&&id){ S.open.add(id); S.oFilter="live"; }
   if(path==="stmt"){ S.tab="orders"; S.oFilter="stmt"; }
   if(path==="wall"){ S.tab="wish"; S.wishView="wall"; S.boardAt=0; }
+  if(path==="inbox"){ S.tab="home"; setTimeout(()=>openInbox(),300); }
 }
 
 /* ---- LINE 專屬能力（外部瀏覽器自動降級） ---- */
@@ -1141,6 +1226,10 @@ async function boot(){
       DB.wishes=wishes.map(M.wish);
       DB.orders=orders.map(M.order);
       DB.stmts=st.statements.map(M.stmt);
+      SHOP.nextStmt=home.shop.next_statement_date||null;
+      INBOX.unread=home.todo&&typeof home.todo.inbox_unread==="number"?home.todo.inbox_unread:null;
+      /* v1.6 寄送申請：舊後端沒有這支時安靜略過，不擋開機 */
+      try{ DB.shipReqs=await req("/ship-requests/list"); SHIP_OK=true; }catch(_){ DB.shipReqs=[]; SHIP_OK=false; }
     }
   }catch(e){
     /* 正式模式載不到資料時不能退回示範資料：客人會看到假的團次與訂單，還可能照著操作 */
@@ -1243,17 +1332,23 @@ var TRACK_STEP = ["賣家已出貨","國際運送中","抵達台灣・清關","�
 
 /* ---------- 資料 ---------- */
 var DB, S;
+var INBOX={unread:null,items:[],next:null,loaded:false,err:false}, SHIP_OK=true;
+function MOCK_DAY(back){ return ymdTW(new Date(Date.now()-back*864e5).toISOString()); }
+function mockImg(bg,emo){ return "data:image/svg+xml,"+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='${bg}'/><text x='50' y='64' font-size='44' text-anchor='middle'>${emo}</text></svg>`); }
 function seed(){
 DB={
  broadcast:[
+  {no:"BC-0913-005",n:"燈芯絨 黃色吊帶褲",e:"👖",jpy:2189,p:780,qty:6,left:5,deadline:"今晚 22:00",note:"日本童裝・可選尺寸",at:"剛剛",hot:true,
+   day:MOCK_DAY(0),sizes:["80","90","100"],imgs:[mockImg("#F6DB96","👖"),mockImg("#F8E2C5","🏷️")]},
   {no:"BC-0913-004",n:"西松屋 六重紗布包巾 限定花色",e:"🧸",jpy:1639,p:600,qty:8,left:8,
-   deadline:"今晚 22:00",note:"顏色：米／灰",at:"剛剛",hot:true},
+   deadline:"今晚 22:00",note:"顏色：米／灰",at:"剛剛",hot:true,day:MOCK_DAY(0),sizes:null,
+   imgs:[mockImg("#E7ECD6","🧸"),mockImg("#F8E2C5","🌼"),mockImg("#F5F4E3","☁️"),mockImg("#F6DB96","🎀")]},
   {no:"BC-0913-003",n:"日本製 嬰兒純棉短襪 三入組",e:"🧦",jpy:979,p:350,qty:20,left:14,
-   deadline:"今晚 22:00",note:"尺寸：9-15cm",at:"2 分鐘前",hot:true},
+   deadline:"今晚 22:00",note:"",at:"2 分鐘前",hot:true,day:MOCK_DAY(0),sizes:["9-12cm","12-15cm"],imgs:[mockImg("#F8E2C5","🧦")]},
   {no:"BC-0913-002",n:"貝親 母乳實感奶嘴 SS",e:"👶",jpy:649,p:250,qty:12,left:3,
-   deadline:"今晚 22:00",note:"",at:"5 分鐘前",hot:false},
-  {no:"BC-0913-001",n:"麵包超人 造型圍兜 兩件",e:"🎽",jpy:1309,p:490,qty:6,left:0,
-   deadline:"已截止",note:"款式：藍／紅",at:"9 分鐘前",hot:false}],
+   deadline:"明天 22:00",note:"",at:"昨天",hot:false,day:MOCK_DAY(1),sizes:null,imgs:[]},
+  {no:"BC-0913-001",n:"麵包超人 造型圍兜 兩件",e:"🎽",jpy:1309,p:490,qty:6,left:2,closed:true,
+   deadline:"已截止",note:"款式：藍／紅",at:"昨天",hot:false,day:MOCK_DAY(1),sizes:null,imgs:[mockImg("#F5D075","🎽")]}],
  wishes:[
   {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null,wall:"public",votes:4,bcNo:null},
   {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null,wall:"private",votes:0,bcNo:null}],
@@ -1265,17 +1360,17 @@ DB={
   {wish_id:"W-087",item_name:"Combi 吸管水壺 替換吸管組",picture:null,votes:6,wants:7,voted:false,mine:false,quote_twd:null,broadcast:null},
   {wish_id:"W-080",item_name:"西松屋 有機棉 短袖包屁衣 80cm",picture:null,votes:2,wants:3,voted:false,mine:false,quote_twd:null,broadcast:null}],
  orders:[
-  {id:"ORD-20260901-014",trip:"0913 大阪團",date:"09/01",st:2,pay:"待付款",split_shipped:false,stmt:null,
-   items:[{n:"六重紗布浴巾 90×90 兩入",q:1,jpy:2519,p:890,e:"🧺",ist:"已到貨"},
-          {n:"米菓仙貝 7個月起 6袋",q:4,jpy:429,p:180,e:"🍘",ist:"採買中"},
-          {n:"泡沫沐浴乳 補充包 400ml",q:1,jpy:869,p:330,e:"🧴",ist:"已到貨"}],
+  {id:"ORD-20260901-014",trip:"0913 大阪團",date:"09/01",st:1,pay:"待付款",split_shipped:false,stmt:null,shipGroup:null,parent:null,
+   items:[{id:"I-1401",n:"六重紗布浴巾 90×90 兩入",q:1,jpy:2519,p:890,e:"🧺",ist:"已到貨"},
+          {id:"I-1402",n:"米菓仙貝 7個月起 6袋",q:4,jpy:429,p:180,e:"🍘",ist:"採買中"},
+          {id:"I-1403",n:"泡沫沐浴乳 補充包 400ml",q:1,jpy:869,p:330,e:"🧴",ist:"已到貨"}],
    total:1940,ship:70,pickup:"7-11 板橋文化門市",pickupAddr:"新北市板橋區文化路188號",
    inv:"手機載具 /AB12+3C",note:"",log:{0:"09/01 21:40",1:"09/02 10:12",2:"09/14 18:05"},splits:null},
-  {id:"ORD-20260906-021",trip:"0913 大阪團",date:"09/06",st:1,pay:"待付款",split_shipped:false,stmt:null,
-   items:[{n:"日本製 嬰兒純棉短襪 三入組",q:2,jpy:979,p:350,e:"🧦",ist:"待採買"}],
+  {id:"ORD-20260906-021",trip:"0913 大阪團",date:"09/06",st:1,pay:"待付款",split_shipped:false,stmt:null,shipGroup:null,parent:null,
+   items:[{id:"I-2101",n:"日本製 嬰兒純棉短襪 三入組",q:2,jpy:979,p:350,e:"🧦",ist:"待採買",size:"9-12cm"}],
    total:770,ship:70,pickup:"7-11 板橋文化門市",pickupAddr:"新北市板橋區文化路188號",
    inv:"手機載具 /AB12+3C",note:"",log:{0:"09/06 12:04",1:"09/06 21:15"},splits:null},
-  {id:"ORD-20260828-007",trip:"0817 東京團",date:"08/28",st:4,pay:"已核對",split_shipped:true,stmt:"STMT-20260901-0031",
+  {id:"ORD-20260828-007",trip:"0817 東京團",date:"08/28",st:4,pay:"已核對",split_shipped:false,stmt:"STMT-20260901-0031",shipGroup:"SG-0012",parent:null,
    items:[{n:"Combi 自然吸韻電動吸乳器",q:1,jpy:2519,p:890,e:"🔌",ist:"已到貨"}],
    total:960,ship:70,pickup:"宅配到府",pickupAddr:"新北市板橋區文化路一段188號 5樓",
    inv:"手機載具 /AB12+3C",note:"",
@@ -1284,6 +1379,17 @@ DB={
      trace:[["08/30 16:40","賣家已出貨","東京集貨倉"],["08/31 09:05","國際運送中","成田機場 NRT"],
             ["09/01 07:22","抵達台灣・清關","桃園機場 TPE"],["09/01 15:20","配送中","台北轉運中心"],
             ["09/02 10:48","可取貨／已送達","板橋"],["09/02 11:10","已完成","本人簽收"]]}]}],
+ shipReqs:[
+  {request_id:"SR-1001",kind:"merge",kind_zh:"併單",status:"approved",status_zh:"已核准",order_ids:["ORD-20260828-007","ORD-20260826-003"],item_ids:[],
+   note:"兩張一起寄就好",decision_note:"已幫你併成一包，運費只收一次",created_at:"2026-08-29T02:10:00.000Z",decided_at:"2026-08-29T05:30:00.000Z",
+   ship_group:{ship_group_id:"SG-0012",status:"已出貨",order_ids:["ORD-20260828-007","ORD-20260826-003"],pickup:"宅配到府",pickup_addr:"新北市板橋區文化路一段188號 5樓",
+     created_at:"2026-08-29T05:30:00.000Z",orders:[{order_id:"ORD-20260828-007",status:"已送達",total_twd:960,ship_fee_twd:70},{order_id:"ORD-20260826-003",status:"已送達",total_twd:540,ship_fee_twd:0}]}}],
+ inbox:[
+  {notif_id:"N-5",kind:"quote_ready",title:"報價好了",body:"你許願的「日本限定 麵包超人 溫度感應湯匙」報價 NT$980，可以加入購物車。",path:"wish",order_id:null,statement_id:null,created_at:new Date(Date.now()-18*6e4).toISOString(),read:false,read_at:null},
+  {notif_id:"N-4",kind:"out_of_stock",title:"缺貨通知",body:"訂單 ORD-20260901-014 的「米菓仙貝」現場缺貨，這項不會收費。",path:"orders",order_id:"ORD-20260901-014",statement_id:null,created_at:new Date(Date.now()-3*36e5).toISOString(),read:false,read_at:null},
+  {notif_id:"N-3",kind:"ship_request",title:"出貨申請",body:"你的併單申請已核准：2 張訂單併成一包寄出，運費 NT$70。",path:"orders",order_id:"ORD-20260828-007",statement_id:null,created_at:"2026-08-29T05:30:00.000Z",read:true,read_at:"2026-08-29T06:00:00.000Z"},
+  {notif_id:"N-2",kind:"payment_received",title:"收到款項",body:"對帳單 STMT-20260901-0031 已收到 NT$960，謝謝！",path:"stmt",order_id:null,statement_id:"STMT-20260901-0031",created_at:"2026-09-01T13:14:00.000Z",read:true,read_at:"2026-09-01T13:20:00.000Z"},
+  {notif_id:"N-1",kind:"statement",title:"對帳單",body:"9/1 對帳單出來了，共 1 筆訂單 NT$960。",path:"stmt",order_id:null,statement_id:"STMT-20260901-0031",created_at:"2026-09-01T02:00:00.000Z",read:true,read_at:"2026-09-01T03:00:00.000Z"}],
  stmts:[
   {id:"STMT-20260901-0031",orders:["ORD-20260828-007"],total:960,pay:"已核對",last5:"31007",
    at:"09/01 02:00",paidAt:"09/01 21:14",payway:"bank",
@@ -1302,10 +1408,12 @@ DB={
    recent:[{b:"7-11",c:"#E03C31",n:"板橋文化門市",id:"148326",a:"新北市板橋區文化路188號",city:"新北市",dist:"板橋區"}]},
  seq:22};
 S={tab:"home",cat:"全部",q:"",cart:[],open:new Set(),showAll:false,
-   pick:"cvs",inv:"carrier",taxId:"",note:"",mergeSel:new Set(),oFilter:"live",wishView:"mine",boardSort:"hot",boardAt:0,
+   pick:"cvs",inv:"carrier",taxId:"",note:"",mergeSel:new Set(),sz:{},oFilter:"live",wishView:"mine",boardSort:"hot",boardAt:0,
    pkCity:"新北市",pkDist:"板橋區",pkQ:"",payway:"credit",_sid:null};
 }
 seed();
+INBOX.unread=DB.inbox.filter(x=>!x.read).length;
+DB.broadcast.forEach(b=>{ if(!b.img&&b.imgs&&b.imgs.length) b.img=b.imgs[0]; });
 
 /* ---------- 工具 ---------- */
 const $  = s=>document.querySelector(s);
@@ -1328,7 +1436,7 @@ function toast(m,ms=2100){const t=$("#toast");t.textContent=m;t.classList.add("s
 function syncBadge(pop){
   const n=cCount(),w=DB.wishes.filter(x=>x.st==="quoted").length,
         o=DB.stmts.filter(x=>x.pay!=="已核對").length;
-  [["#cartBadge",n],["#tabBadge",n],["#wishBadge",w],["#ordBadge",o]].forEach(([s,v])=>{
+  [["#cartBadge",n],["#tabBadge",n],["#wishBadge",w],["#ordBadge",o],["#bellBadge",INBOX.unread||0]].forEach(([s,v])=>{
     const b=$(s);if(!b)return;b.textContent=v;b.style.display=v?"grid":"none";
     if(pop&&v&&(s==="#cartBadge"||s==="#tabBadge")){b.classList.remove("pop");void b.offsetWidth;b.classList.add("pop");}});
 }
@@ -1406,32 +1514,39 @@ function doDrop(k){
 /* ---------- 連線喊單 ---------- */
 async function shout(no,n,confirmed){
   n=n||1;
+  const pre=DB.broadcast.find(x=>x.no===no);
+  if(pre&&!pre.closed&&pre.left>0&&pre.sizes&&!S.sz[no]){ toast("請先選尺寸再按＋1"); return; }
   if(!confirmed&&!DB.me.shoutAck){ return shoutAck(no,n); }
   const it=DB.broadcast.find(x=>x.no===no);
   if(!it)return;
-  if(it.left<=0){ return waitlist(no); }
+  if(it.closed||it.left<=0){ return waitlist(no); }
+  const size=it.sizes?S.sz[no]:null;
+  if(it.sizes&&!size){ toast("請先選尺寸再按＋1"); return; }
   /* 數量由伺服端原子判定，前端不自行決定成敗 */
   let take, left;
   try{
-    var r=await API.shout(no,n);
+    var r=await API.shout(no,n,size);
     take=r.granted; left=r.remaining;
   }catch(e){
     if(e.code==="SOLD_OUT"){ it.left=0; render(); return waitlist(no); }
-    if(e.code==="DEADLINE_PASSED"){ it.deadline="已截止"; render(); return; }
+    if(e.code==="DEADLINE_PASSED"){ it.deadline="已截止"; it.closed=true; render(); return; }
+    if(e.code==="SIZE_REQUIRED"||e.code==="BAD_SIZE"){ delete S.sz[no]; render(); return; }
     if(e.code==="SUSPENDED"){ DB.me.suspended=true; DB.me.drops=Math.max(DB.me.drops,DB.me.dropsLimit); render(); return; }
     return;                                     // 其他錯誤已提示，不動狀態
   }
   if(!take){ it.left=0; render(); return waitlist(no); }
   it.left=left;
-  const l=line("broadcast",no);
+  /* 同一個尺寸才併成同一筆，不同尺寸各一筆（合約 11） */
+  const l=S.cart.find(x=>x.src==="broadcast"&&x.ref===no&&(x.size||null)===(size||null));
   const cid=r.cart_item&&r.cart_item.cart_id;
-  if(l){ l.q+=take; l.max=l.q+it.left; if(cid) l.cid=cid; }
-  else S.cart.push({k:"L"+no,cid,src:"broadcast",ref:no,n:it.n,e:it.e,img:it.img||null,p:it.p,jpy:it.jpy,q:take,
-                    max:take+it.left,conf:"high",st:"confirmed",note:it.note||""});
+  if(l){ l.q+=take; if(cid) l.cid=cid; }
+  else S.cart.push({k:"L"+no+(size?"|"+size:""),cid,src:"broadcast",ref:no,n:it.n,e:it.e,img:it.img||null,p:it.p,jpy:it.jpy,q:take,
+                    max:take+it.left,conf:"high",st:"confirmed",note:it.note||"",size:size||null});
+  S.cart.filter(x=>x.src==="broadcast"&&x.ref===no).forEach(x=>{ x.max=x.q+it.left; });   // 各尺寸共用餘量
   syncBadge(true);
   const rank=it.qty-it.left;
   toast(take<n?`只剩 ${take} 份，已幫你喊到 ${take} 份`:`喊到了！你是第 ${rank} 位・${it.left?"還剩 "+it.left+" 份":"已搶完"}`,2400);
-  echoToChat(`✅ 已喊單　${it.no}　${it.n} ×${take}　NT$${nf(it.p*take)}`);
+  echoToChat(`✅ 已喊單　${it.no}　${it.n}${size?"（"+size+"）":""} ×${take}　NT$${nf(it.p*take)}`);
   render();
 }
 function shoutAck(no,n){
@@ -1441,6 +1556,7 @@ function shoutAck(no,n){
       <b>喊單＝確定購買</b><br>連線商品是小幫手在現場替你拿下的實體商品，喊了就會被結進帳，不是先放著看看。</div>
     <div class="list" style="margin-top:12px"><div class="item">
       <div class="ph">${it.e}</div><div class="info"><b>${it.no}　${esc(it.n)}</b>
+        ${it.sizes&&S.sz[no]?`<div class="tiny dim">尺寸 ${esc(S.sz[no])}</div>`:""}
         <div class="sm" style="font-weight:900;color:var(--pine-deep);margin-top:3px">NT$${nf(it.p)} × ${n}</div></div></div></div>
     <div class="sm" style="color:var(--ink-2);line-height:1.9;margin-top:12px">
       ・喊到就佔掉現場名額，其他人不能再喊<br>
@@ -1473,11 +1589,14 @@ function shoutMore(no){
         <div class="tiny dim">現場剩 ${it.left} / ${it.qty} 份</div></div></div>
     <div class="field" style="margin-top:14px"><label>數量</label>
       <input id="sq" type="number" value="1" min="1" max="${Math.max(1,it.left)}" inputmode="numeric"></div>
+    ${it.sizes?`<div class="field"><label>尺寸（必選）</label><select id="ssz"><option value="">請選尺寸</option>
+      ${it.sizes.map(z=>`<option ${S.sz[no]===z?"selected":""}>${esc(z)}</option>`).join("")}</select></div>`:""}
     <p class="tiny dim" style="line-height:1.7">連線商品為現場現貨，先搶先贏、不接受保留。連線結束後 30 分鐘內未結帳，名額自動釋出。</p>`,
    `<button class="btn primary block" onclick="doShout('${no}')">確認喊單</button>`);
 }
 function doShout(no){
   const n=Math.max(1,parseInt($("#sq").value||"1",10));
+  const z=$("#ssz"); if(z){ if(!z.value){ toast("請先選尺寸"); return; } S.sz[no]=z.value; }
   closeSheet(); shout(no,n,true);
 }
 
@@ -1612,7 +1731,7 @@ function checkout(){
   const o={id:`ORD-2609${pad(d.getDate())}-${pad(DB.seq)}`,
     trip:TRIP.name,date:`${d.getMonth()+1}/${pad(d.getDate())}`,st:0,pay:"待付款",
     split_shipped:false,stmt:null,
-    items:C.map(l=>({n:l.n,q:l.q,p:l.p||0,e:l.e,src:l.src,jpy:l.jpy||0,ist:"待採買"})),
+    items:C.map((l,i)=>({id:"I-"+DB.seq+"-"+i,n:l.n,q:l.q,p:l.p||0,e:l.e,src:l.src,jpy:l.jpy||0,ist:"待採買",size:l.size||null})),shipGroup:null,parent:null,
     total:sub+ship,ship,
     pickup:S.pick==="cvs"?DB.me.pickup:"宅配到府",
     pickupAddr:S.pick==="cvs"?DB.me.pickupAddr:DB.me.addr,
@@ -2339,6 +2458,7 @@ function cartLine(l){
         <span class="pill ${c.c}" style="padding:1px 7px;font-size:10.5px">${c.e} ${c.t}</span>
         ${l.st==="pending"&&cf&&l.conf!=="high"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}</div>
       <b>${esc(l.n)}</b>
+      ${l.size?`<div class="tiny" style="font-weight:700;color:var(--soft-ink)">尺寸 ${esc(l.size)}</div>`:""}
       ${l.nja?`<div class="tiny dim">${esc(l.nja)}</div>`:""}
       ${l.file?`<div class="tiny dim code" style="opacity:.75">${esc(l.file)}</div>`:""}
       ${l.note?`<div class="tiny dim">${esc(l.note)}</div>`:""}
@@ -2399,19 +2519,31 @@ function wishQuick(){
    `<button class="btn quiet block" onclick="closeSheet();openWall()">先看看大家許了什麼</button>`);
 }
 /* 每日連線＋1 的商品卡（兩欄） */
+function livePhoto(it){
+  const imgs=(it.imgs&&it.imgs.length?it.imgs:(it.img?[it.img]:[])).slice(0,4);
+  if(!imgs.length) return `<div class="lphoto zoomable" onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')"><span>${it.e}</span></div>`;
+  if(imgs.length===1) return `<div class="lphoto zoomable" onclick="lightbox('img','${jsq(imgs[0])}','${jsq(it.n)}')">
+        <img src="${esc(imgs[0])}" alt="${esc(it.n)}" loading="lazy" onerror="imgExpired()"></div>`;
+  /* 多張照片拼成 2×2（2 張左右排、3 張第一張佔左半） */
+  return `<div class="lphoto collage n${imgs.length}">${imgs.map((u,i)=>`<div class="ci" onclick="lightbox('img','${jsq(u)}','${jsq(it.n)}（${i+1}/${imgs.length}）')">
+      <img src="${esc(u)}" alt="${esc(it.n)} 第 ${i+1} 張" loading="lazy" onerror="imgExpired()"></div>`).join("")}</div>`;
+}
+function pickSize(no,z){ S.sz[no]=S.sz[no]===z?undefined:z; if(!S.sz[no]) delete S.sz[no]; render(); }
 function liveTile(it){
-  const l=line("broadcast",it.no), got=l?l.q:0, wl=DB.me.waitlist.indexOf(it.no)>=0;
-  const closed=it.deadline==="已截止", sold=it.left<=0;
-  return `<div class="livecard ltile ${sold?"sold":""}">
-    ${it.img?`<div class="lphoto zoomable" onclick="lightbox('img','${jsq(it.img)}','${jsq(it.n)}')">
-        <img src="${esc(it.img)}" alt="${esc(it.n)}" loading="lazy" onerror="imgExpired()"></div>`
-      :`<div class="lphoto zoomable" onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')"><span>${it.e}</span></div>`}
+  const got=S.cart.filter(x=>x.src==="broadcast"&&x.ref===it.no).reduce((a,x)=>a+x.q,0), wl=DB.me.waitlist.indexOf(it.no)>=0;
+  const closed=!!it.closed||it.deadline==="已截止", sold=it.left<=0;
+  const need=!!it.sizes&&!S.sz[it.no];
+  return `<div class="livecard ltile ${sold?"sold":""} ${closed?"closed":""}" data-no="${esc(it.no)}">
+    ${livePhoto(it)}
     <b class="lname">${esc(it.n)}</b>
     ${it.note?`<span class="tiny dim">${esc(it.note)}</span>`:""}
     <span class="ptag">NT$ ${nf(it.p)}</span>
-    <span class="tiny dim">${closed?"已截止":sold?"已搶完":`剩 ${it.left} 份・${esc(it.deadline)} 截止`}${got?`・已喊 ${got}`:""}</span>
-    ${closed?`<button class="btn quiet sm block" disabled>已截止</button>`
-      :sold?`<button class="btn quiet sm block" onclick="waitlist('${it.no}')">${wl?"已排候補・取消":"排候補"}</button>`
+    ${it.sizes&&!closed&&!sold?`<div class="szbar" role="group" aria-label="選尺寸">${it.sizes.map(z=>
+      `<button class="${S.sz[it.no]===z?"on":""}" onclick="pickSize('${jsq(it.no)}','${jsq(z)}')">${esc(z)}</button>`).join("")}</div>`
+      :it.sizes?`<span class="tiny dim">尺寸：${it.sizes.map(esc).join("／")}</span>`:""}
+    <span class="tiny dim">${closed?"已截止・可以排候補":sold?"已搶完・可以排候補":`剩 ${it.left} 份${it.deadline?`・${esc(it.deadline)} 截止`:""}`}${got?`・已喊 ${got}`:""}</span>
+    ${closed||sold?`<button class="btn quiet sm block" onclick="waitlist('${it.no}')">${wl?"已排候補・取消":"排候補"}</button>`
+      :need?`<button class="btn quiet sm block" onclick="toast('請先選尺寸再按＋1')">先選尺寸</button>`
       :`<button class="btn primary sm block" onclick="shout('${it.no}',1)">＋1 放入購物車</button>
         <button class="link" style="align-self:center" onclick="shoutMore('${it.no}')">要多份？</button>`}
   </div>`;
@@ -2551,6 +2683,7 @@ function vOrders(){
       <button class="${S.oFilter==="stmt"?"on":""}" onclick="setOF('stmt')">對帳單 ${DB.stmts.length}</button></div>
     <div style="height:12px"></div>
     ${stage?`<div class="chipbar">只看「${stage.t}」<button onclick="setOF('live')">看全部 ✕</button></div>`:""}
+    ${S.oFilter==="live"&&!stage?shipPanel():""}
     ${S.oFilter==="stmt"?vStmt():rows.length?rows.map(orderCard).join("")
       :`<div class="empty" style="padding:40px 10px"><div style="font-size:36px">📦</div>
         <h3>${S.oFilter==="live"?"目前沒有進行中的訂單":"還沒有已完成的訂單"}</h3>
@@ -2583,7 +2716,7 @@ function orderCard(o){
         <div class="zoomable" style="width:38px;height:38px;font-size:17px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;flex:none"
           onclick="lightbox('emoji','${jsq(i.e)}','${jsq(i.n)}')">${i.e}</div>
         <div style="flex:1;min-width:0"><div class="sm">${esc(i.n)}</div>
-          <div class="tiny dim">× ${i.q}　税込 ¥${nf(i.jpy)}　
+          <div class="tiny dim">${i.size?`尺寸 ${esc(i.size)}　`:""}× ${i.q}　税込 ¥${nf(i.jpy)}　
             <span style="color:${i.ist==="已到貨"?"var(--pine)":"var(--ink-3)"};font-weight:700">${i.ist}</span></div></div>
         <div class="sm" style="font-weight:700">NT$${nf(i.p*i.q)}</div></div>`).join("")}
       <div class="sumrow" style="padding-top:8px;border-top:1px dashed var(--line);margin-top:6px">
@@ -2593,12 +2726,15 @@ function orderCard(o){
         發票：${esc(o.inv)}${o.note?`<br>備註：${esc(o.note)}`:""}
         ${o.stmt?`<br>對帳單：${o.stmt}`:""}</div>
 
-      ${(o.st>=1&&o.st<3)?`<div class="alert ${arr.length&&pen.length?"gold":"pine"}" style="display:flex;align-items:center;gap:10px">
-        <span style="flex:1">${arr.length&&pen.length
-          ? `<b>${arr.length} 項已到貨、${pen.length} 項還在採買</b><br>${o.split_shipped?"已申請先出貨":"可申請先出貨，運費仍只收一次"}`
-          : arr.length ? `<b>全部品項已到貨</b><br>整理中，出貨後會通知` : `<b>日本採買中</b><br>到貨後可申請先出貨`}</span>
-        ${arr.length&&pen.length?`<button class="btn ${o.split_shipped?"quiet":"primary"} sm" onclick="splitAsk('${o.id}')">
-          ${o.split_shipped?"取消申請":"申請先出貨"}</button>`:""}
+      ${o.parent?`<div class="alert pine">這張是從 <b>${esc(o.parent)}</b> 拆出來先寄的部分。</div>`:""}
+      ${o.shipGroup?`<div class="alert pine"><b>已排進出貨單 ${esc(o.shipGroup)}</b><br>${(()=>{const g=shipGroupOf(o.id);
+          return g?`${esc(g.status)}・${g.order_ids.length} 張一起寄・${esc(g.pickup||"")}`:"跟其他訂單一起寄出";})()}</div>`
+      :(o.st>=1&&o.st<3)?`<div class="alert ${arr.length&&pen.length?"gold":"pine"}" style="display:flex;align-items:center;gap:10px">
+        <span style="flex:1">${pendingReq(o.id)?`<b>寄送申請審核中</b><br>${esc(pendingReq(o.id).kind_zh)}申請已送出，店家確認後會通知`
+          : arr.length&&pen.length
+          ? `<b>${arr.length} 項已到貨、${pen.length} 項還在採買</b><br>${o.st===1?"可以申請到貨先拆單寄出":"整理中，出貨後會通知"}`
+          : arr.length ? `<b>全部品項已到貨</b><br>整理中，出貨後會通知` : `<b>日本採買中</b><br>到貨後可申請先拆單寄出`}</span>
+        ${!pendingReq(o.id)&&canSplit(o)?`<button class="btn primary sm" onclick="S.shipSel=new Set(['${o.id}']);shipStart('split')">先拆單寄</button>`:""}
       </div>`:""}
 
       ${o.splits?o.splits.map((sp,i)=>`<div class="ship ${sp.step>=0?"":"warn"}">
@@ -2620,49 +2756,193 @@ function orderCard(o){
     </div></details>`;
 }
 
-/* ---------- 拆單申請（對應 orders.split_shipped） ---------- */
-function splitAsk(oid){
-  const o=DB.orders.find(x=>x.id===oid);
-  const arr=o.items.filter(i=>i.ist==="已到貨"), pen=o.items.filter(i=>i.ist!=="已到貨");
-  if(o.split_shipped){
-    o.split_shipped=false; o.splits=null; render(); toast("已取消先出貨申請，會等齊了一起寄");
-    API.splitRequest(oid,false).catch(()=>{ o.split_shipped=true; render(); }); return;
-  }
-  openSheet("申請先出貨",`
-    <div class="alert pine" style="margin-top:0">已到貨 <b>${arr.length}</b> 項可先寄，另 <b>${pen.length}</b> 項還在日本採買。</div>
-    <div class="h2" style="margin:16px 0 8px">先寄這些</div>
-    <div class="list">${arr.map(i=>`<div class="item"><div class="ph">${i.e}</div>
-      <div class="info"><b>${esc(i.n)}</b><div class="tiny dim">× ${i.q}</div></div>
-      <span class="pill pine" style="align-self:center">已到貨</span></div>`).join("")}</div>
-    <div class="h2" style="margin:16px 0 8px">這些等下一批</div>
-    <div class="list">${pen.map(i=>`<div class="item"><div class="ph">${i.e}</div>
-      <div class="info"><b>${esc(i.n)}</b><div class="tiny dim">× ${i.q}</div></div>
-      <span class="pill grey" style="align-self:center">${i.ist}</span></div>`).join("")}</div>
-    <div class="sm" style="color:var(--ink-2);line-height:1.9;margin-top:14px">
-      ・台灣端運費仍<b>只收一次</b>，不因拆單重複計費<br>
-      ・申請後會通知小幫手安排，出貨時推播追蹤號碼</div>`,
-    `<button class="btn primary block" onclick="doSplit('${oid}')">確認申請先出貨</button>`);
+/* ---------- 出貨申請：併單／到貨先拆單寄（合約 30～32，取代舊的「申請先出貨」） ---------- */
+function pendingReq(oid){ return (DB.shipReqs||[]).find(r=>r.status==="pending"&&r.order_ids.indexOf(oid)>=0)||null; }
+function shipGroupOf(oid){ const r=(DB.shipReqs||[]).find(r=>r.ship_group&&r.ship_group.order_ids.indexOf(oid)>=0); return r?r.ship_group:null; }
+function canMerge(o){ return !o.exception&&(o.st===1||o.st===2)&&!o.shipGroup&&!pendingReq(o.id); }
+function canSplit(o){ if(!canMerge(o)||o.st!==1) return false;
+  const arr=o.items.filter(i=>i.ist==="已到貨").length; return arr>0&&arr<o.items.length; }
+function pickType(o){ return /宅配/.test(o.pickup||"")?"home":"cvs"; }
+function shipToggle(oid,on){ if(!S.shipSel) S.shipSel=new Set(); on?S.shipSel.add(oid):S.shipSel.delete(oid); render(); }
+function shipPanel(){
+  if(!SHIP_OK) return "";
+  const el=DB.orders.filter(canMerge), reqs=DB.shipReqs||[];
+  if(!el.length&&!reqs.length) return "";
+  const sel=[...(S.shipSel||new Set())].filter(id=>el.some(o=>o.id===id));
+  const one=sel.length===1&&canSplit(DB.orders.find(o=>o.id===sel[0]));
+  return `<section class="shippanel" id="shippanel">
+    <h3>我想怎麼寄？</h3>
+    <p class="tiny dim" style="margin:0 0 6px;line-height:1.7">勾選訂單 → 選「併單」或「到貨先拆單寄」→ 店家確認運費後通知你。</p>
+    ${el.length?el.map(o=>{ const arr=o.items.filter(i=>i.ist==="已到貨").length;
+      return `<label class="shipsel"><input type="checkbox" ${sel.indexOf(o.id)>=0?"checked":""} onchange="shipToggle('${o.id}',this.checked)">
+        <div class="ph">${o.items[0]?o.items[0].e:"📦"}</div>
+        <div style="flex:1;min-width:0"><div class="sm" style="font-weight:700;color:var(--title)">${o.items[0]?esc(o.items[0].n):esc(o.id)}${o.items.length>1?` 等 ${o.items.length} 項`:""}</div>
+          <div class="tiny dim">${o.id}・${esc(o.pickup||"")}</div></div>
+        <span class="pill ${o.st===2?"pine":arr?"gold":"grey"}" style="flex:none">${o.st===2?"已到貨":arr?`到貨 ${arr}/${o.items.length}`:"已報價"}</span></label>`;}).join("")
+      :`<p class="sm dim" style="margin:6px 0">目前沒有可以申請的訂單（要「已報價」或「已到貨」）。</p>`}
+    ${el.length?`<div class="tiny dim" style="margin-top:6px">已選 <b>${sel.length}</b> 筆</div>
+    <div class="shipcards">
+      <button class="shipcard merge" aria-disabled="${sel.length<2}" onclick="shipStart('merge')">
+        <span style="font-size:20px">⇄</span><b>商品併單</b><span class="tiny dim">勾選的訂單到貨後一起寄，運費只收一次</span><span class="go">選擇併單 →</span></button>
+      <button class="shipcard split" aria-disabled="${!one}" onclick="shipStart('split')">
+        <span style="font-size:20px">▢</span><b>到貨先拆單寄出</b><span class="tiny dim">先寄已到貨的商品，其餘繼續等</span><span class="go">選擇拆單 →</span></button>
+    </div>
+    <div class="shipnote">拆單額外運費：超商 NT$${nf(FX.cvs)}・宅配 NT$${nf(FX.home)}<br>實際運費由店家確認；併單第一張保留運費，其他待付款的訂單運費歸 0。</div>`:""}
+    ${reqs.length?`<div class="h2" style="margin:16px 0 2px">我的寄送申請</div>${reqs.slice(0,S.showAllReq?50:3).map(reqCard).join("")}
+      ${reqs.length>3&&!S.showAllReq?`<button class="link" style="margin-top:8px" onclick="S.showAllReq=true;render()">看全部 ${reqs.length} 筆 ›</button>`:""}`:""}
+  </section>`;
 }
-function doSplit(oid){
-  const o=DB.orders.find(x=>x.id===oid);
-  if(!CFG.mock){                                   // 子單與追蹤號碼由後端安排，不在前台編
-    closeSheet();
-    API.splitRequest(oid,true).then(async()=>{
-      o.split_shipped=true; render(); toast("已送出先出貨申請，小幫手會收到通知",2600);
-      try{ DB.orders=(await API.orderList()).map(M.order); render(); }catch(_){}
-    }).catch(()=>{});
+var REQ_PILL={pending:"gold",approved:"pine",rejected:"beni",cancelled:"grey"};
+function reqCard(r){
+  const g=r.ship_group, fee=g?g.orders.reduce((a,x)=>a+(x.ship_fee_twd||0),0):null;
+  return `<div class="sreq" data-req="${esc(r.request_id)}">
+    <div class="between"><b class="sm">${esc(r.kind_zh||"")}申請</b><span class="pill ${REQ_PILL[r.status]||"grey"}">${esc(r.status_zh||r.status)}</span></div>
+    <div class="tiny dim" style="margin-top:3px;line-height:1.7">${esc(r.request_id)}・${fmtTs(r.created_at)} 送出<br>
+      訂單：${r.order_ids.map(esc).join("、")}${r.kind==="split"&&r.item_ids&&r.item_ids.length?`（先寄 ${r.item_ids.length} 項）`:""}
+      ${r.note?`<br>備註：${esc(r.note)}`:""}</div>
+    ${r.decision_note?`<div class="tiny" style="margin-top:5px;color:var(--title)">店家回覆：${esc(r.decision_note)}</div>`:""}
+    ${g?`<div class="tiny" style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);line-height:1.8">
+      出貨單 <b>${esc(g.ship_group_id)}</b>・${esc(g.status)}・${esc(g.pickup||"")}${g.pickup_addr?`<br>${esc(g.pickup_addr)}`:""}
+      <br>店家確認運費：<b style="color:var(--pine)">NT$${nf(fee)}</b>
+      ${g.orders.map(x=>`<br><span class="dim">${esc(x.order_id)}・運費 NT$${nf(x.ship_fee_twd||0)}・小計 NT$${nf(x.total_twd)}</span>`).join("")}</div>`:""}
+    ${r.status==="pending"?`<button class="btn quiet sm" style="margin-top:8px" onclick="shipCancel('${jsq(r.request_id)}')">取消申請</button>`:""}
+  </div>`;
+}
+function shipStart(kind){
+  const sel=[...(S.shipSel||new Set())].map(id=>DB.orders.find(o=>o.id===id)).filter(o=>o&&canMerge(o));
+  if(kind==="merge"){
+    if(sel.length<2){ toast("請勾選 2 張以上要一起寄的訂單"); return; }
+    if(sel.length>10){ toast("一次最多併 10 張訂單"); return; }
+    openSheet("商品併單",`
+      <div class="alert pine" style="margin-top:0">這 <b>${sel.length}</b> 張訂單會等到齊後一起寄，運費只收一次。</div>
+      <div class="h2" style="margin:14px 0 6px">寄到哪裡</div>
+      ${sel.map((o,i)=>`<label class="shipsel"><input type="radio" name="shipto" value="${esc(o.id)}" ${i===0?"checked":""}>
+        <div style="flex:1;min-width:0"><div class="sm" style="font-weight:700">${esc(o.pickup||"")}</div>
+          <div class="tiny dim">${esc(o.pickupAddr||"")}${o.pickupAddr?"・":""}用 ${o.id} 的寄送地址</div></div></label>`).join("")}
+      ${shipWayField(sel[0])}
+      <div class="field" style="margin-top:12px"><label>備註（選填）</label><textarea id="shipnote" rows="2" placeholder="例如：請放一起包、週末再寄"></textarea></div>`,
+      `<button class="btn primary block" onclick="shipSubmit('merge')">送出併單申請</button>`);
     return;
   }
-  const arr=o.items.filter(i=>i.ist==="已到貨"), pen=o.items.filter(i=>i.ist!=="已到貨");
-  o.split_shipped=true;
-  o.splits=[
-    {no:"子單 1／2",items:arr.map(i=>`${i.n.slice(0,10)} ×${i.q}`).join("、"),
-     carrier:"cvs711",no2:String(88200000000+Math.floor(Math.random()*8e7)),
-     eta:"已申請・待小幫手安排出貨",step:0,trace:[[now(),"賣家已出貨","日本集貨倉"]]},
-    {no:"子單 2／2",items:pen.map(i=>`${i.n.slice(0,10)} ×${i.q}`).join("、"),
-     carrier:null,no2:null,eta:"待剩餘品項到貨後出貨",step:-1,trace:[]}];
-  closeSheet(); render(); toast("已送出先出貨申請，小幫手會收到通知",2600);
-  API.splitRequest(oid,true).catch(()=>{ o.split_shipped=false; o.splits=null; render(); });
+  if(sel.length!==1||!canSplit(sel[0])){ toast("請只勾選 1 張「部分商品已到貨」的訂單"); return; }
+  const o=sel[0], arr=o.items.filter(i=>i.ist==="已到貨"), pen=o.items.filter(i=>i.ist!=="已到貨");
+  openSheet("到貨先拆單寄出",`
+    <div class="alert gold" style="margin-top:0">${o.id}：已到貨 <b>${arr.length}</b> 項可以先寄，另 <b>${pen.length}</b> 項之後再寄。</div>
+    <div class="h2" style="margin:14px 0 6px">先寄這些（可取消勾選）</div>
+    ${arr.map(i=>`<label class="shipsel"><input type="checkbox" class="splitit" value="${esc(i.id||"")}" checked>
+      <div class="ph">${i.e}</div><div style="flex:1;min-width:0"><div class="sm">${esc(i.n)}</div>
+      <div class="tiny dim">${i.size?`尺寸 ${esc(i.size)}・`:""}× ${i.q}</div></div><span class="pill pine">已到貨</span></label>`).join("")}
+    <div class="h2" style="margin:14px 0 6px">之後再寄</div>
+    ${pen.map(i=>`<div class="shipsel" style="cursor:default"><div class="ph">${i.e}</div><div style="flex:1;min-width:0"><div class="sm">${esc(i.n)}</div>
+      <div class="tiny dim">× ${i.q}</div></div><span class="pill grey">${esc(i.ist||"")}</span></div>`).join("")}
+    ${shipWayField(o)}
+    <div class="field" style="margin-top:12px"><label>備註（選填）</label><textarea id="shipnote" rows="2" placeholder="例如：急用，先寄浴巾"></textarea></div>
+    <p class="tiny dim" style="line-height:1.7">先寄的部分會另外算一次運費（超商 NT$${nf(FX.cvs)}／宅配 NT$${nf(FX.home)}）；母單已付款或已出對帳單就不另收。以店家確認為準。</p>`,
+    `<button class="btn primary block" onclick="shipSubmit('split','${o.id}')">送出拆單申請</button>`);
+}
+/* 寄送方式：合約 30 沒有收寄送方式欄位，跟訂單不同時寫進備註讓店家看（見交接「需後端配合」） */
+function shipWayField(o){
+  const t=pickType(o);
+  return `<div class="h2" style="margin:14px 0 6px">寄送方式</div>
+    <div class="seg" style="grid-template-columns:1fr 1fr">
+      <button type="button" class="${t==="cvs"?"on":""}" data-way="cvs" onclick="shipWay(this)">超商取貨</button>
+      <button type="button" class="${t==="home"?"on":""}" data-way="home" onclick="shipWay(this)">宅配到府</button></div>
+    <input type="hidden" id="shipway" value="${t}" data-orig="${t}">`;
+}
+function shipWay(btn){ btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b===btn)); $("#shipway").value=btn.dataset.way; }
+async function shipSubmit(kind,oid){
+  const way=$("#shipway"), noteEl=$("#shipnote");
+  let note=(noteEl&&noteEl.value||"").trim();
+  const shipTo=kind==="merge"?(document.querySelector("input[name=shipto]:checked")||{}).value:null;
+  const base=kind==="merge"?DB.orders.find(o=>o.id===shipTo):DB.orders.find(o=>o.id===oid);
+  if(way&&base&&way.value!==pickType(base)){
+    const want=way.value==="home"?`希望改宅配到府（${DB.me.addr||"地址請小幫手跟我確認"}）`:`希望改超商取貨（${DB.me.pickup||"門市請小幫手跟我確認"}）`;
+    note=want+(note?"；"+note:"");
+  }
+  let body;
+  if(kind==="merge") body={kind:"merge",order_ids:[...S.shipSel].filter(id=>DB.orders.some(o=>o.id===id&&canMerge(o))),ship_to_order_id:shipTo,note};
+  else {
+    const ids=[...document.querySelectorAll(".splitit:checked")].map(x=>x.value);
+    if(!ids.length){ toast("至少要勾一項先寄"); return; }
+    body={kind:"split",order_id:oid,note};
+    if(ids.every(Boolean)) body.item_ids=ids;
+  }
+  if(!body.note) delete body.note;
+  try{
+    const r=await API.shipCreate(body);
+    DB.shipReqs=[r].concat((DB.shipReqs||[]).filter(x=>x.request_id!==r.request_id));
+    S.shipSel=new Set(); closeSheet(); render();
+    toast(`已送出${r.kind_zh||""}申請，店家確認後會通知你`,2600);
+    if(!CFG.mock){ try{ DB.shipReqs=await API.shipList(); render(); }catch(_){} }
+  }catch(e){ /* call() 已顯示後端的 error.message */ }
+}
+async function shipCancel(id){
+  try{
+    const r=await API.shipCancel(id);
+    const i=(DB.shipReqs||[]).findIndex(x=>x.request_id===id); if(i>=0) DB.shipReqs[i]=r&&r.request_id?r:Object.assign(DB.shipReqs[i],{status:"cancelled",status_zh:"已取消"});
+    render(); toast("已取消寄送申請");
+  }catch(e){ if(e.code==="ALREADY_DECIDED"&&!CFG.mock){ try{ DB.shipReqs=await API.shipList(); render(); }catch(_){} } }
+}
+
+/* ---------- 站內通知中心（合約 34～36） ---------- */
+async function openInbox(){
+  openSheet("通知",`<div id="inboxBody"><div class="sm dim" style="padding:20px 0;text-align:center">載入中…</div></div>`,
+    `<button class="btn quiet block" onclick="inboxReadAll()">全部標為已讀</button>`);
+  try{
+    const r=await API.inboxList();
+    INBOX.items=r.items||[]; INBOX.next=r.next_before||null; INBOX.unread=typeof r.unread==="number"?r.unread:INBOX.unread; INBOX.err=false;
+  }catch(e){ INBOX.err=true; }
+  INBOX.loaded=true; paintInbox(); syncBadge();
+}
+async function inboxMore(){
+  if(!INBOX.next) return;
+  try{ const r=await API.inboxList(INBOX.next); INBOX.items=INBOX.items.concat(r.items||[]); INBOX.next=r.next_before||null; paintInbox(); }catch(_){}
+}
+function paintInbox(){
+  const el=$("#inboxBody"); if(!el) return;
+  if(INBOX.err){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>通知暫時載不到</h3><p>請稍後再試；重要通知也會用 LINE 傳給你。</p></div>`; return; }
+  if(!INBOX.items.length){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>還沒有通知</h3><p>報價、收款、缺貨、出貨申請和對帳單的消息都會放在這裡。</p></div>`; return; }
+  el.innerHTML=`<p class="tiny dim" style="margin:0 0 4px">${INBOX.unread?`${INBOX.unread} 則未讀`:"都看過了"}</p>`+INBOX.items.map(x=>`
+    <button class="inrow ${x.read?"read":""}" data-nid="${esc(x.notif_id)}" onclick="inboxGo('${jsq(x.notif_id)}')">
+      <span class="dot ${x.read?"read":""}"></span>
+      <span style="flex:1;min-width:0"><b>${esc(x.title||"通知")}</b>
+        <span class="sm" style="display:block;color:var(--ink-2);line-height:1.6;margin-top:2px;white-space:pre-line">${esc(x.body||x.text||"")}</span>
+        <span class="tiny dim">${fmtTs(x.created_at)}${x.path?"・點一下查看":""}</span></span></button>`).join("")
+    +(INBOX.next?`<button class="btn quiet block" style="margin-top:10px" onclick="inboxMore()">載入更早的通知</button>`:"");
+}
+function inboxGo(id){
+  const x=INBOX.items.find(i=>i.notif_id===id); if(!x) return;
+  if(!x.read){
+    x.read=true; INBOX.unread=Math.max(0,(INBOX.unread||0)-1); syncBadge();
+    API.inboxRead({notif_ids:[id]}).then(r=>{ if(r&&typeof r.unread==="number"){ INBOX.unread=r.unread; syncBadge(); } }).catch(()=>{ x.read=false; INBOX.unread=(INBOX.unread||0)+1; syncBadge(); paintInbox(); });
+  }
+  if(!x.path){ paintInbox(); return; }
+  closeSheet();
+  if(x.path==="orders"){ S.oFilter="live"; S.oStage=null; if(x.order_id){ S.open.add(x.order_id); const o=DB.orders.find(z=>z.id===x.order_id); if(o&&(o.exception||o.st>=4)) S.oFilter="done"; } go("orders"); }
+  else if(x.path==="stmt"){ S.oFilter="stmt"; S.oStage=null; go("orders"); }
+  else if(x.path==="wish"){ S.wishView="mine"; go("wish"); }
+  else if(x.path==="live"){ go("live"); }
+  else go("home");
+}
+async function inboxReadAll(){
+  if(!INBOX.items.some(x=>!x.read)&&!INBOX.unread){ toast("都看過了"); return; }
+  try{ const r=await API.inboxRead({all:true}); INBOX.items.forEach(x=>x.read=true); INBOX.unread=r&&typeof r.unread==="number"?r.unread:0; syncBadge(); paintInbox(); toast("全部標為已讀"); }catch(_){}
+}
+
+/* ---------- 小幫手邀請碼（合約 33，選做） ---------- */
+function staffJoin(){
+  openSheet("我是小幫手",`<p class="sm" style="color:var(--ink-2);margin-top:0;line-height:1.8">店家給你的 8 碼邀請碼輸入在這裡。成功後請用<b>同一個 LINE 帳號</b>登入後台。</p>
+    <div class="field"><label>邀請碼</label><input id="invcode" maxlength="12" autocapitalize="characters" placeholder="例如 AB12-CD34"></div>`,
+    `<button class="btn primary block" onclick="doStaffJoin()">送出</button>`);
+}
+async function doStaffJoin(){
+  const c=($("#invcode").value||"").trim(); if(!c){ toast("請輸入邀請碼"); return; }
+  try{
+    const r=await API.staffJoin(c);
+    openSheet("加入成功",`<div class="alert pine" style="margin-top:0"><b>你現在是${esc(r.role_zh||"小幫手")}</b><br>${esc(r.nickname||"")} ${esc(r.member_no||"")}</div>
+      <p class="sm" style="line-height:1.8">請用同一個 LINE 帳號打開後台：<br><a href="https://japan-front-end-system.vercel.app/admin" target="_blank" rel="noopener">japan-front-end-system.vercel.app/admin</a></p>`,
+      `<button class="btn quiet block" onclick="closeSheet()">知道了</button>`);
+  }catch(_){}
 }
 function confirmGot(oid){
   const o=DB.orders.find(x=>x.id===oid);
@@ -2677,7 +2957,7 @@ function vStmt(){
   return `
     ${unbilled.length?`<div class="alert gold">
       <b>尚未結算 ${unbilled.length} 筆・NT$${nf(sum)}</b><br>
-      每月 15 日、月底結算，結算後會推播對帳單給你。</div>`:""}
+      ${SHOP.nextStmt?`下次結算日 <b>${esc(SHOP.nextStmt)}</b>，`:"每月 15 日、月底結算，"}結算後會推播對帳單給你。</div>`:""}
     ${DB.stmts.map(t=>`<div class="order" style="padding:14px;margin-top:11px">
       <div class="between">
         <div><div class="oid">${t.id}</div>
@@ -2889,6 +3169,10 @@ function vMe(){
           <span class="tiny dim">${DB.me.suspended?"喊單資格暫停中・付清對帳單後恢復":DB.me.drops?`棄單 ${DB.me.drops} / ${DB.me.dropsLimit} 次`:"正常・可參加連線喊單"}</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="terms()"><span style="font-size:17px">❓</span>
         <span><span style="font-weight:500">代購須知</span><br><span class="tiny dim">價格、缺貨、拆單、取貨與結算規則</span></span><span class="ar">›</span></button>
+      <button class="mrow" onclick="openInbox()"><span style="font-size:17px">🔔</span>
+        <span><span style="font-weight:500">通知中心</span><br><span class="tiny dim">${INBOX.unread?`${INBOX.unread} 則未讀`:"報價、收款、缺貨、出貨申請、對帳單"}</span></span><span class="ar">›</span></button>
+      <button class="mrow" onclick="staffJoin()"><span style="font-size:17px">🪪</span>
+        <span><span style="font-weight:500">我是小幫手</span><br><span class="tiny dim">輸入店家給的邀請碼</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="support()"><span style="font-size:17px">💬</span>
         <span><span style="font-weight:500">轉接客服</span><br><span class="tiny dim">由小幫手接手，回到 LINE 聊天室</span></span><span class="ar">›</span></button>
     </div>
