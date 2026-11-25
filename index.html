@@ -543,6 +543,20 @@ box-shadow:0 4px 0 #D9A93F,0 8px 16px rgba(86,80,66,.14)}
 .leafcard .prog{margin-top:2px;padding:3px 6px;font-size:10.5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .inrow .nico{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-size:17px;flex:none;position:relative}
 .inrow .nico .dot{position:absolute;top:-1px;right:-1px;margin:0;border:2px solid #fff;width:10px;height:10px}
+/* 周小姐的插畫（2026-11-25）：tree.png 載得到時，插畫放上面、卡片排下面；載不到時沿用 CSS 畫的樹 */
+.tree.hasimg{background:linear-gradient(180deg,#FBF7EA 0,var(--treebg) 46%);padding-top:10px}
+.tree.hasimg .treeimg{position:relative;inset:auto;display:block;width:min(64%,250px);height:auto;aspect-ratio:852/859;
+object-fit:contain;opacity:1;margin:0 auto -6px;filter:drop-shadow(0 6px 10px rgba(86,80,66,.12))}
+.tree.mini.hasimg .treeimg{width:min(46%,170px);margin-bottom:-4px}
+.tree.hasimg .canopy{background:none;box-shadow:none;border-radius:18px;padding:10px 4px 6px}
+.tree.mini.hasimg .canopy{padding:10px 2px 4px}
+.tree.hasimg .canopy::before,.tree.hasimg .canopy::after{display:none}
+.tree.hasimg .trunk{display:none}
+.tree.hasimg .woodsign{margin-top:8px}
+.shiphead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.shiphead h3{margin:0}
+.stmthead{display:flex;align-items:center;gap:10px;margin:2px 0 10px}
+.stmthead b{font-size:15px;color:var(--title)}
 </style>
 </head>
 <body>
@@ -2513,7 +2527,7 @@ function homeTree(){
   return `<div class="sechead">${mascot("bunny","🐰",34)}<h2>大家的許願樹</h2>
       <button class="btn soft sm" onclick="wishQuick()">＋許個願</button></div>
     <div class="tree mini" onclick="openWall()" style="cursor:pointer">
-      <img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()">
+      <img class="treeimg" src="assets/tree.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()">
       <div class="canopy">${rows.length?rows.map(b=>`<div class="leafcard">
           ${b.img?`<img src="${b.img}" alt="" onerror="imgExpired()">`:`<div class="ph">⭐</div>`}
           <span class="lname">${esc(b.title)}</span><span class="lwant">🙋 ${b.wants}</span>${progLine(b)}</div>`).join("")
@@ -2615,7 +2629,7 @@ function vWall(){
     ${S.boardBusy&&!rows.length?`<div class="empty" style="padding:30px 10px"><span class="spin"></span><p>載入中…</p></div>`
     :S.boardErr&&!rows.length?`<div class="empty" style="padding:30px 10px"><h3>許願牆暫時打不開</h3>
         <button class="btn quiet" onclick="loadBoard(true)">再試一次</button></div>`
-    :rows.length?`<div class="tree"><img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
+    :rows.length?`<div class="tree"><img class="treeimg" src="assets/tree.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
       <div class="row" style="align-items:flex-start">
         ${b.img?`<img class="pv zoomable" src="${b.img}" alt="" onerror="imgExpired()" onclick="lightbox('img','${jsq(b.img)}','${jsq(b.title)}')">`:`<div class="ph">⭐</div>`}
         <div style="flex:1;min-width:0">
@@ -2785,7 +2799,7 @@ function shipPanel(){
   const sel=[...(S.shipSel||new Set())].filter(id=>el.some(o=>o.id===id));
   const one=sel.length===1&&canSplit(DB.orders.find(o=>o.id===sel[0]));
   return `<section class="shippanel" id="shippanel">
-    <h3>我想怎麼寄？</h3>
+    <div class="shiphead">${mascot("goose","🪿",46)}<h3>我想怎麼寄？</h3></div>
     <p class="tiny dim" style="margin:0 0 6px;line-height:1.7">勾選訂單 → 選「併單」或「到貨先拆單寄」→ 店家確認運費後通知你。</p>
     ${el.length?el.map(o=>{ const arr=o.items.filter(i=>i.ist==="已到貨").length;
       return `<label class="shipsel"><input type="checkbox" ${sel.indexOf(o.id)>=0?"checked":""} onchange="shipToggle('${o.id}',this.checked)">
@@ -2916,8 +2930,8 @@ async function inboxMore(){
 }
 function paintInbox(){
   const el=$("#inboxBody"); if(!el) return;
-  if(INBOX.err){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>通知暫時載不到</h3><p>請稍後再試；重要通知也會用 LINE 傳給你。</p></div>`; return; }
-  if(!INBOX.items.length){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>還沒有通知</h3><p>報價、收款、缺貨、出貨申請和對帳單的消息都會放在這裡。</p></div>`; return; }
+  if(INBOX.err){ el.innerHTML=`<div class="empty" style="padding:26px 6px">${mascot("cat","🐱",84)}<h3>通知暫時載不到</h3><p>請稍後再試；重要通知也會用 LINE 傳給你。</p></div>`; return; }
+  if(!INBOX.items.length){ el.innerHTML=`<div class="empty" style="padding:26px 6px">${mascot("cat","🐱",84)}<h3>還沒有通知</h3><p>報價、收款、缺貨、出貨申請和對帳單的消息都會放在這裡。</p></div>`; return; }
   el.innerHTML=`<p class="tiny dim" style="margin:0 0 4px">${INBOX.unread?`${INBOX.unread} 則未讀`:"都看過了"}</p>`+INBOX.items.map(x=>`
     <button class="inrow ${x.read?"read":""}" data-nid="${esc(x.notif_id)}" onclick="inboxGo('${jsq(x.notif_id)}')">
       <span class="nico" aria-hidden="true">${NOTIF_ICON[x.kind]||"🔔"}${x.read?"":`<span class="dot"></span>`}</span>
@@ -2972,6 +2986,8 @@ function vStmt(){
   const unbilled=DB.orders.filter(o=>!o.stmt&&o.st>=1);
   const sum=unbilled.reduce((a,o)=>a+o.total,0);
   return `
+    <div class="stmthead">${mascot("squirrel","🐿️",48)}<div><b>對帳單</b>
+      <div class="tiny dim">每一次結算、付款和發票紀錄都在這裡</div></div></div>
     ${unbilled.length?`<div class="alert gold">
       <b>尚未結算 ${unbilled.length} 筆・NT$${nf(sum)}</b><br>
       ${SHOP.nextStmt?`下次結算日 <b>${esc(SHOP.nextStmt)}</b>，`:"每月 15 日、月底結算，"}結算後會推播對帳單給你。</div>`:""}
