@@ -557,6 +557,15 @@ object-fit:contain;opacity:1;margin:0 auto -6px;filter:drop-shadow(0 6px 10px rg
 .shiphead h3{margin:0}
 .stmthead{display:flex;align-items:center;gap:10px;margin:2px 0 10px}
 .stmthead b{font-size:15px;color:var(--title)}
+/* v1.8：許願預算、提前結帳、結帳偏好（2026-11-26） */
+.budget{margin-top:8px;padding:8px 10px;border-radius:11px;border:1px dashed #E3C98F;background:#FFF9EC;line-height:1.65}
+.budget .row{gap:8px}
+.budget .rule{flex:1;min-width:0;font-size:12px;color:var(--title)}
+.decide{margin-top:8px;padding:9px 10px;border-radius:11px;background:var(--pine-soft);line-height:1.65}
+.decide .row{gap:8px;margin-top:6px}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.proofrow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.proofrow img{width:60px;height:60px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -821,7 +830,7 @@ var API={
   wishKeep     : (id)=>P_("/wishes/keep",{wish_id:id},"保留許願"),
   wishRemove   : (id)=>P_("/wishes/remove",{wish_id:id},"刪除許願"),
   wishBoard    : (sort)=>G_("/wishes/board?sort="+(sort==="new"?"new":"hot"),"載入許願牆"),
-  wishPlus     : (id,on)=>P_("/wishes/plus",{wish_id:id,on},"+1"),
+  wishPlus     : (id,on,bud)=>P_("/wishes/plus",Object.assign({wish_id:id,on},on&&bud?bud:{}),"+1"),
   wishShare    : (id,pub)=>P_("/wishes/share",{wish_id:id,public:pub},"許願牆設定"),
   checkout     : (b)=>P_("/orders/checkout",b,"送出訂單"),
   orderList    : ()=>G_("/orders/list","載入訂單"),
@@ -836,7 +845,15 @@ var API={
   received     : (oid)=>P_("/orders/received",{order_id:oid},"回報收到"),
   track        : (oid)=>G_("/shipments/track?order_id="+encodeURIComponent(oid),"查詢物流"),
   stmtList     : ()=>G_("/statements/list","載入對帳單"),
-  reportTransfer:(sid,last5)=>P_("/statements/report-transfer",{statement_id:sid,last5},"回報付款"),
+  reportTransfer:(sid,last5,shot)=>P_("/statements/report-transfer",shot?{statement_id:sid,last5,screenshot:shot}:{statement_id:sid,last5},"回報付款"),
+  stmtEarly    : ()=>P_("/statements/early",{},"提前結帳"),
+  /* v1.8 許願預算（合約 37～40）、結帳偏好（42～43） */
+  wishBudget   : (id,a,r)=>P_("/wishes/budget",{wish_id:id,auto_buy_max:a,reject_above:r},"許願預算"),
+  wishDecide   : (id,accept)=>P_("/wishes/decide",{wish_id:id,accept},"回覆報價"),
+  wishAutoCancel:(id)=>P_("/wishes/auto-cancel",{wish_id:id},"取消自動保留"),
+  wishDecisions: ()=>G_("/wishes/decisions","載入自動處理紀錄"),
+  prefsGet     : ()=>G_("/me/checkout-prefs","載入結帳偏好"),
+  prefsSet     : (b)=>P_("/me/checkout-prefs",b,"儲存結帳偏好"),
   /* 付款初始化：把合約回應轉成畫面用的格式；銀行轉帳是人工流程，不打 API */
   payInit: async (sid,payway,invoice)=>{
     if(payway==="bank") return {payway,manual:true};
@@ -869,11 +886,11 @@ var M={
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
     quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null,
-    prog:w.progress_note||null,progAt:w.progress_at||null,
+    prog:w.progress_note||null,progAt:w.progress_at||null,budget:w.my_budget||null,dec:w.my_decision||null,
     wall:w.wall_status||"private",votes:w.votes||0,bcNo:w.broadcast_send_id||null}),
   /* 許願牆一則：只有商品和人數，沒有任何人的身分（合約 27） */
   board:(b)=>({id:b.wish_id,title:b.item_name,img:b.picture||null,votes:b.votes||0,wants:b.wants||((b.votes||0)+1),
-    voted:!!b.voted,mine:!!b.mine,quote:b.quote_twd,prog:b.progress_note||null,progAt:b.progress_at||null,
+    voted:!!b.voted,mine:!!b.mine,quote:b.quote_twd,prog:b.progress_note||null,progAt:b.progress_at||null,budget:b.my_budget||null,dec:b.my_decision||null,
     bc:b.broadcast?{no:b.broadcast.send_id,p:b.broadcast.price_twd,left:b.broadcast.remaining,
       deadline:b.broadcast.deadline_at?fmtTs(b.broadcast.deadline_at):""}:null}),
   order:(o)=>{ const st=OS.indexOf(o.status); const log={};
@@ -886,6 +903,7 @@ var M={
       splits:(o.shipments||[]).length?o.shipments.map((sh,i,a)=>({no:a.length>1?`子單 ${i+1}／${a.length}`:"單批出貨",items:"全部品項",
         carrier:CARRIER_CODE[sh.carrier]||"cvs711",no2:sh.tracking_no,eta:sh.eta||"",step:4,trace:[]})):null}; },
   stmt:(t)=>({id:t.statement_id,orders:t.order_ids||[],total:t.total_amount,pay:t.payment_status,last5:t.last_five_matched,
+    proof:!!t.has_transfer_proof,reportedAt:t.transfer_reported_at?fmtTs(t.transfer_reported_at):"",
     at:fmtTs(t.created_at),paidAt:fmtTs(t.paid_at),payway:t.payway,
     inv:t.invoice_no?{st:"issued",no:t.invoice_no,date:fmtTs(t.invoice_at),carrier:DB.me.carrier,amount:t.total_amount}:null,
     vacc:t.v_account||null,vaccBank:t.v_bank||null,vaccDue:t.v_expire_at?fmtDue(t.v_expire_at):null}),
@@ -939,6 +957,8 @@ async function mockApi(path,method,body){
     return {wish_id:body.wish_id,wall_status:body.public?(w&&w.wall==="public"?"public":"pending"):"private",votes:w?w.votes:0};
   }
   if(path.indexOf("/ship-requests/")===0||path.indexOf("/inbox/")===0||path==="/staff/join") return mockV16(path,body);
+  if(path.indexOf("/wishes/budget")===0||path.indexOf("/wishes/decide")===0||path.indexOf("/wishes/auto-cancel")===0||path.indexOf("/wishes/decisions")===0
+     ||path==="/statements/early"||path==="/me/checkout-prefs") return mockV18(path,method,body);
   if(path==="/cart/remove") return {cart_id:body.cart_id,shout_drops:DB.me.drops,drops_limit:DB.me.dropsLimit,shout_suspended:DB.me.drops>=DB.me.dropsLimit};
   return {mock:true};
 }
@@ -981,6 +1001,60 @@ function mockV16(path,body){
     const c=String(body.code||"").replace(/[\s-]/g,"").toUpperCase();
     if(c.length!==8) throw new ApiErr("INVITE_INVALID","邀請碼不對，請再確認一次",{status:400});
     return {role:"helper",role_zh:"小幫手",nickname:DB.me.nickname,member_no:DB.me.memberNo,next:"請用同一個 LINE 帳號登入後台"};
+  }
+  return {mock:true};
+}
+/* 示範模式：許願預算、提前結帳、結帳偏好（形狀照合約 37～43） */
+function mockV18(path,method,body){
+  const ruleText=budgetText;
+  if(path==="/wishes/budget"){
+    const a=body.auto_buy_max, r=body.reject_above;
+    if((a!=null&&!(a>0))||(r!=null&&!(r>0))||(a!=null&&r!=null&&a>r)) throw new ApiErr("BAD_BUDGET","預算要大於 0，而且「自動買」不能比「自動略過」高",{status:400});
+    const w=DB.wishes.find(x=>x.id===body.wish_id), b=DB.boardSeed.find(x=>x.wish_id===body.wish_id);
+    if(!w&&!(b&&(b.voted||b.mine))) throw new ApiErr("NOT_VOTED","要先按 +1 才能設預算",{status:409});
+    const my_budget=a==null&&r==null?null:{auto_buy_max:a,reject_above:r,rule_text:ruleText(a,r),updated_at:new Date().toISOString()};
+    if(b) b.my_budget=my_budget;
+    return {wish_id:body.wish_id,my_budget,my_decision:w?w.dec:(b?b.my_decision:null)};
+  }
+  if(path==="/wishes/decide"){
+    const b=DB.boardSeed.find(x=>x.wish_id===body.wish_id), d=b&&b.my_decision;
+    if(!d||!d.can_decide) throw new ApiErr("NOTHING_TO_DECIDE","這則沒有在等你決定",{status:409});
+    Object.assign(d,{status:body.accept?"accepted":"declined",status_zh:body.accept?"已放進購物車":"不要了",can_decide:false,can_cancel:!!body.accept,decided_at:new Date().toISOString()});
+    return {wish_id:body.wish_id,my_decision:d,cart_item:body.accept?{cart_id:"C-W"+body.wish_id,source:"wish",ref:body.wish_id,name:b.item_name,price_twd:d.quote_twd,qty:1,status:"confirmed"}:null};
+  }
+  if(path==="/wishes/auto-cancel"){
+    const w=DB.wishes.find(x=>x.id===body.wish_id), b=DB.boardSeed.find(x=>x.wish_id===body.wish_id);
+    const d=(w&&w.dec)||(b&&b.my_decision);
+    if(!d||!d.can_cancel) throw new ApiErr("NOTHING_TO_CANCEL","沒有自動保留的品項",{status:409});
+    Object.assign(d,{status:"cancelled",status_zh:"已取消",can_cancel:false});
+    return {wish_id:body.wish_id,my_decision:d};
+  }
+  if(path==="/wishes/decisions") return [];
+  if(path==="/statements/early"){
+    const os=DB.orders.filter(o=>!o.exception&&o.st>=1&&!o.stmt&&o.pay!=="已核對");
+    if(!os.length) throw new ApiErr("NOTHING_TO_BILL","目前沒有可以結的訂單",{status:409});
+    const id="STMT-EARLY-"+String(DB.stmts.length+1).padStart(4,"0");
+    os.forEach(o=>o.stmt=id);
+    return {statement_id:id,order_ids:os.map(o=>o.id),total_amount:os.reduce((a,o)=>a+o.total,0),payment_status:"待付款",created_at:new Date().toISOString()};
+  }
+  if(path==="/me/checkout-prefs"){
+    const P=DB.prefs;
+    if(method==="GET") return P;
+    if("payway" in body){ if(body.payway!=null&&!PAYWAY[body.payway]) throw new ApiErr("BAD_PAYWAY","付款方式不對",{status:400});
+      P.payway=body.payway; P.payway_zh=body.payway?PAYWAY[body.payway].t:null; }
+    if("pickup" in body){ if(body.pickup==null) P.pickup=null;
+      else if(body.pickup.type==="home"){ if(!DB.me.addr) throw new ApiErr("PICKUP_INCOMPLETE","還沒有宅配地址，請先填收件地址",{status:400});
+        P.pickup={type:"home",addr:DB.me.addr,from_default:true,text:"宅配到府 "+DB.me.addr}; }
+      else { if(!DB.me.pickup) throw new ApiErr("PICKUP_INCOMPLETE","還沒有取貨門市",{status:400});
+        P.pickup={type:"cvs",store_name:DB.me.pickup,addr:DB.me.pickupAddr,from_default:true,text:"超商取貨 "+DB.me.pickup}; } }
+    if("invoice" in body){ const v=body.invoice;
+      if(v==null) P.invoice=null;
+      else if(v.type==="carrier"){ if(!/^\/[0-9A-Z.+-]{7}$/.test(v.carrier||"")) throw new ApiErr("BAD_CARRIER","手機載具要 / 開頭加 7 碼",{status:400}); P.invoice={type:"carrier",carrier:v.carrier}; }
+      else if(v.type==="donate"){ if(!/^\d{3,7}$/.test(v.donate_code||"")) throw new ApiErr("BAD_DONATE_CODE","捐贈碼是 3～7 位數字",{status:400}); P.invoice={type:"donate",donate_code:v.donate_code}; }
+      else { if(!/^\d{8}$/.test(v.tax_id||"")) throw new ApiErr("BAD_TAX_ID","統一編號要 8 位數字",{status:400});
+        if(!(v.company||"").trim()) throw new ApiErr("BAD_COMPANY","請填公司抬頭",{status:400}); P.invoice={type:"tax",tax_id:v.tax_id,company:v.company.trim()}; } }
+    if("note" in body) P.note=body.note||"";
+    P.updated_at=new Date().toISOString(); return P;
   }
   return {mock:true};
 }
@@ -1258,6 +1332,8 @@ async function boot(){
       INBOX.unread=home.todo&&typeof home.todo.inbox_unread==="number"?home.todo.inbox_unread:null;
       /* v1.6 寄送申請：舊後端沒有這支時安靜略過，不擋開機 */
       try{ DB.shipReqs=await req("/ship-requests/list"); SHIP_OK=true; }catch(_){ DB.shipReqs=[]; SHIP_OK=false; }
+      /* v1.8 結帳偏好：舊後端沒有這支時安靜略過 */
+      try{ PREFS=await req("/me/checkout-prefs"); applyPrefs(); }catch(_){ PREFS=null; }
     }
   }catch(e){
     /* 正式模式載不到資料時不能退回示範資料：客人會看到假的團次與訂單，還可能照著操作 */
@@ -1360,7 +1436,7 @@ var TRACK_STEP = ["賣家已出貨","國際運送中","抵達台灣・清關","�
 
 /* ---------- 資料 ---------- */
 var DB, S;
-var INBOX={unread:null,items:[],next:null,loaded:false,err:false}, SHIP_OK=true;
+var INBOX={unread:null,items:[],next:null,loaded:false,err:false}, SHIP_OK=true, PREFS=null;
 function MOCK_DAY(back){ return ymdTW(new Date(Date.now()-back*864e5).toISOString()); }
 function mockImg(bg,emo){ return "data:image/svg+xml,"+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='${bg}'/><text x='50' y='64' font-size='44' text-anchor='middle'>${emo}</text></svg>`); }
 function seed(){
@@ -1379,12 +1455,16 @@ DB={
    deadline:"已截止",note:"款式：藍／紅",at:"昨天",hot:false,day:MOCK_DAY(1),sizes:null,imgs:[mockImg("#F5D075","🎽")]}],
  wishes:[
   {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null,wall:"public",votes:4,bcNo:null,
-   prog:"大阪阪急問過了，藍色那款還有貨",progAt:new Date(Date.now()-2*36e5).toISOString()},
+   prog:"大阪阪急問過了，藍色那款還有貨",progAt:new Date(Date.now()-2*36e5).toISOString(),
+   budget:{auto_buy_max:1000,reject_above:1500,rule_text:"報價 ≤ NT$1,000 自動幫你買；超過 NT$1,500 自動略過；中間的會問你"},
+   dec:{decision_id:"D-1",decision:"auto_buy",decision_zh:"自動保留",status:"open",status_zh:"已放進購物車",quote_twd:980,authorization_max:1000,reject_above:1500,cart_id:null,can_cancel:true,can_decide:false}},
   {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null,wall:"private",votes:0,bcNo:null,prog:null,progAt:null}],
  board:[],
  boardSeed:[
   {wish_id:"W-104",item_name:"日本限定 麵包超人 溫度感應湯匙",picture:null,votes:4,wants:5,voted:false,mine:true,quote_twd:980,broadcast:null},
   {wish_id:"W-091",item_name:"阿卡將 限定口水巾 三入",picture:null,votes:11,wants:12,voted:true,mine:false,quote_twd:null,
+   my_budget:{auto_buy_max:300,reject_above:500,rule_text:"報價 ≤ NT$300 自動幫你買；超過 NT$500 自動略過；中間的會問你"},
+   my_decision:{decision_id:"D-2",decision:"pending",decision_zh:"在中間，等你決定",status:"open",status_zh:"等你回覆",quote_twd:350,authorization_max:300,reject_above:500,cart_id:null,can_cancel:false,can_decide:true},
    broadcast:{send_id:"BC-0913-003",price_twd:350,remaining:14,deadline_at:null}},
   {wish_id:"W-087",item_name:"Combi 吸管水壺 替換吸管組",picture:null,votes:6,wants:7,voted:false,mine:false,quote_twd:null,broadcast:null,
    progress_note:"心齋橋店缺貨，下週補貨再幫大家看",progress_at:new Date(Date.now()-5*36e5).toISOString()},
@@ -1414,7 +1494,10 @@ DB={
    note:"兩張一起寄就好",decision_note:"已幫你併成一包，運費只收一次",created_at:"2026-08-29T02:10:00.000Z",decided_at:"2026-08-29T05:30:00.000Z",
    ship_group:{ship_group_id:"SG-0012",status:"已出貨",order_ids:["ORD-20260828-007","ORD-20260826-003"],pickup:"宅配到府",pickup_addr:"新北市板橋區文化路一段188號 5樓",
      created_at:"2026-08-29T05:30:00.000Z",orders:[{order_id:"ORD-20260828-007",status:"已送達",total_twd:960,ship_fee_twd:70},{order_id:"ORD-20260826-003",status:"已送達",total_twd:540,ship_fee_twd:0}]}}],
+ prefs:{payway:"credit",payway_zh:"信用卡",pickup:{type:"cvs",text:"超商取貨 7-11 板橋文化門市",from_default:true},
+   invoice:{type:"carrier",carrier:"/AB12+3C"},note:"",integration_status:"not_connected",integration_note:"電子發票還沒有串接，店家會照你的設定另外開立"},
  inbox:[
+  {notif_id:"N-8",kind:"wish_auto",title:"許願預算自動處理",body:"你按 +1 的「阿卡將 限定口水巾 三入」報價 NT$350，在你的預算中間，要不要買？",path:"wish",order_id:null,statement_id:null,created_at:new Date(Date.now()-3*6e4).toISOString(),read:false,read_at:null},
   {notif_id:"N-6",kind:"bought",title:"小幫手幫你買到了",body:"🛍️ 小幫手幫你買到了「六重紗布浴巾 90×90 兩入」，已加進訂單 ORD-20260901-014。",path:"orders",order_id:"ORD-20260901-014",statement_id:null,created_at:new Date(Date.now()-6*6e4).toISOString(),read:false,read_at:null},
   {notif_id:"N-5",kind:"quoted",title:"報價好了",body:"你許願的「日本限定 麵包超人 溫度感應湯匙」報價 NT$980，可以加入購物車。",path:"wish",order_id:null,statement_id:null,created_at:new Date(Date.now()-18*6e4).toISOString(),read:false,read_at:null},
   {notif_id:"N-4",kind:"out_of_stock",title:"缺貨通知",body:"訂單 ORD-20260901-014 的「米菓仙貝」現場缺貨，這項不會收費。",path:"orders",order_id:"ORD-20260901-014",statement_id:null,created_at:new Date(Date.now()-3*36e5).toISOString(),read:false,read_at:null},
@@ -1444,6 +1527,7 @@ S={tab:"home",cat:"全部",q:"",cart:[],open:new Set(),showAll:false,
 }
 seed();
 INBOX.unread=DB.inbox.filter(x=>!x.read).length;
+if(CFG.mock){ PREFS=DB.prefs; applyPrefs(); }
 DB.broadcast.forEach(b=>{ if(!b.img&&b.imgs&&b.imgs.length) b.img=b.imgs[0]; });
 
 /* ---------- 工具 ---------- */
@@ -1726,6 +1810,58 @@ function saveCarrier(){
 }
 
 /* ---------- 結帳 ---------- */
+/* 結帳偏好（合約 42～43）：開機時帶進結帳頁，客人可以再改 */
+function applyPrefs(){
+  const P=PREFS; if(!P) return;
+  if(P.pickup&&(P.pickup.type==="cvs"||P.pickup.type==="home")) S.pick=P.pickup.type;
+  if(P.invoice&&P.invoice.type){ S.inv=P.invoice.type;
+    if(P.invoice.type==="carrier"&&P.invoice.carrier) DB.me.carrier=P.invoice.carrier;
+    if(P.invoice.type==="donate") S.donate=P.invoice.donate_code||"";
+    if(P.invoice.type==="tax"){ S.taxId=P.invoice.tax_id||""; S.company=P.invoice.company||""; } }
+  if(P.payway&&PAYWAY[P.payway]) S.payway=P.payway;
+  if(typeof P.note==="string") S.note=P.note;
+}
+function invBody(){
+  return S.inv==="tax"?{type:"tax",tax_id:S.taxId,company:S.company||undefined}
+    :S.inv==="donate"?{type:"donate",donate_code:S.donate||undefined}:{type:"carrier",carrier:DB.me.carrier};
+}
+function invText(){ return S.inv==="carrier"?"手機載具 "+DB.me.carrier:S.inv==="donate"?"捐贈發票"+(S.donate?" "+S.donate:""):"統編 "+S.taxId+(S.company?" "+S.company:""); }
+function prefsSheet(){
+  const P=PREFS||{}, inv=P.invoice||{type:"carrier",carrier:DB.me.carrier}, pk=(P.pickup&&P.pickup.type)||"cvs";
+  S._pf={payway:P.payway||"credit",pick:pk,inv:inv.type||"carrier"};
+  openSheet("結帳偏好",`
+    <p class="tiny dim" style="margin-top:0;line-height:1.7">下次結帳會自動帶入，結帳時還是可以改。</p>
+    <div class="h2" style="margin:10px 0 6px">付款方式</div>
+    <div class="seg" style="grid-template-columns:repeat(${payways().length},1fr)" id="pfpay">${payways().map(([k,w])=>`<button type="button" data-v="${k}" class="${S._pf.payway===k?"on":""}" onclick="pfSet('payway',this)">${w.t}</button>`).join("")}</div>
+    <div class="h2" style="margin:14px 0 6px">取貨方式</div>
+    <div class="seg" style="grid-template-columns:1fr 1fr" id="pfpick">
+      <button type="button" data-v="cvs" class="${pk==="cvs"?"on":""}" onclick="pfSet('pick',this)">超商取貨</button>
+      <button type="button" data-v="home" class="${pk==="home"?"on":""}" onclick="pfSet('pick',this)">宅配到府</button></div>
+    <div class="tiny dim" style="margin-top:6px">超商：${esc(DB.me.pickup||"還沒設定")}　宅配：${esc(DB.me.addr||"還沒設定")}（在「我的」修改）</div>
+    <div class="h2" style="margin:14px 0 6px">發票</div>
+    <div class="seg three" style="grid-template-columns:1fr 1fr 1fr" id="pfinv">
+      <button type="button" data-v="carrier" class="${S._pf.inv==="carrier"?"on":""}" onclick="pfSet('inv',this)">手機載具</button>
+      <button type="button" data-v="donate" class="${S._pf.inv==="donate"?"on":""}" onclick="pfSet('inv',this)">捐贈</button>
+      <button type="button" data-v="tax" class="${S._pf.inv==="tax"?"on":""}" onclick="pfSet('inv',this)">統編</button></div>
+    <div class="field" style="margin-top:8px" data-inv="carrier"><label>載具號碼</label><input id="pfcar" maxlength="8" placeholder="/ABC1234" value="${esc(inv.carrier||DB.me.carrier||"")}"></div>
+    <div class="field" style="margin-top:8px" data-inv="donate"><label>捐贈碼（3～7 位數字）</label><input id="pfdon" maxlength="7" inputmode="numeric" placeholder="例 168001" value="${esc(inv.donate_code||"")}"></div>
+    <div class="field" style="margin-top:8px" data-inv="tax"><label>統一編號</label><input id="pftax" maxlength="8" inputmode="numeric" value="${esc(inv.tax_id||"")}">
+      <label style="margin-top:8px">公司抬頭</label><input id="pfcom" maxlength="60" value="${esc(inv.company||"")}"></div>
+    <div class="field"><label>特殊備註（店家出貨時看得到）</label><input id="pfnote" maxlength="200" placeholder="例：送禮請勿附價錢" value="${esc(P.note||"")}"></div>
+    <div class="alert gold" style="margin:4px 0 0"><span class="tiny">${esc(P.integration_note||"電子發票還沒有串接，店家會照你的設定另外開立")}</span></div>`,
+    `<button class="btn primary block" onclick="savePrefs()">儲存偏好</button>`);
+  pfInvShow();
+}
+function pfSet(k,btn){ btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b===btn)); S._pf[k]=btn.dataset.v; if(k==="inv") pfInvShow(); }
+function pfInvShow(){ document.querySelectorAll("#sheet [data-inv]").forEach(el=>{ el.style.display=el.dataset.inv===S._pf.inv?"":"none"; }); }
+async function savePrefs(){
+  const v=id=>($("#"+id)&&$("#"+id).value.trim())||"";
+  const inv=S._pf.inv==="carrier"?{type:"carrier",carrier:v("pfcar").toUpperCase()}:S._pf.inv==="donate"?{type:"donate",donate_code:v("pfdon")}:{type:"tax",tax_id:v("pftax"),company:v("pfcom")};
+  try{
+    const r=await API.prefsSet({payway:S._pf.payway,pickup:{type:S._pf.pick},invoice:inv,note:v("pfnote")||null});
+    PREFS=r||PREFS; applyPrefs(); closeSheet(); render(); toast("結帳偏好已儲存");
+  }catch(_){}
+}
 function setPick(v){S.pick=v;render();}
 function setInv(v){S.inv=v;render();}
 function reviewOrder(){
@@ -1747,7 +1883,7 @@ function reviewOrder(){
       <div class="sumrow"><span>取貨</span><span style="text-align:right;max-width:62%">${
         S.pick==="cvs"?esc(DB.me.pickup)+"<br><span class='tiny dim'>"+esc(DB.me.pickupAddr)+"</span>"
         :"宅配到府<br><span class='tiny dim'>"+esc(DB.me.addr)+"</span>"}</span></div>
-      <div class="sumrow"><span>發票</span><span>${S.inv==="carrier"?"手機載具 "+esc(DB.me.carrier):S.inv==="donate"?"捐贈發票":"統編 "+esc(S.taxId)}</span></div>
+      <div class="sumrow"><span>發票</span><span>${esc(invText())}</span></div>
       ${S.note?`<div class="sumrow"><span>備註</span><span style="text-align:right;max-width:62%">${esc(S.note)}</span></div>`:""}
     </div>
     <p class="tiny" style="margin:10px 2px 0;color:var(--beni);line-height:1.7">
@@ -1766,12 +1902,12 @@ function checkout(){
     total:sub+ship,ship,
     pickup:S.pick==="cvs"?DB.me.pickup:"宅配到府",
     pickupAddr:S.pick==="cvs"?DB.me.pickupAddr:DB.me.addr,
-    inv:S.inv==="carrier"?"手機載具 "+DB.me.carrier:S.inv==="donate"?"捐贈發票":"統編 "+S.taxId,
+    inv:invText(),
     note:S.note,log:{0:now()},splits:null};
   DB.orders.unshift(o); const kept=S.cart.filter(l=>l.st==="pending"); const sent=C.slice();
-  S.cart=kept; S.note="";
+  S.cart=kept; S.note=PREFS&&PREFS.note||"";
   API.checkout({cart_ids:C.map(l=>l.cid).filter(Boolean),pickup:{type:S.pick},
-    invoice:{type:S.inv,carrier:DB.me.carrier,tax_id:S.taxId},note:o.note})
+    invoice:invBody(),note:o.note})
     .then(r=>{ if(r&&r.order_id){ const i=DB.orders.indexOf(o); if(i>=0) DB.orders[i]=M.order(r); S.open.add(r.order_id); render(); } })
     .catch(()=>{ DB.orders=DB.orders.filter(x=>x!==o); S.cart=sent.concat(kept); syncBadge(); render(); }); S.open.add(o.id); S.oFilter="live";
   closeSheet(); syncBadge(); go("orders");
@@ -1788,10 +1924,10 @@ async function checkoutLive(C){
   CHECKING_OUT=true;
   try{
     const r=await API.checkout({cart_ids:C.map(l=>l.cid),pickup:{type:S.pick},
-      invoice:{type:S.inv,carrier:DB.me.carrier,tax_id:S.taxId},note:S.note});
+      invoice:invBody(),note:S.note});
     const o=M.order(r);
     DB.orders.unshift(o);
-    S.cart=S.cart.filter(l=>C.indexOf(l)<0); S.note="";
+    S.cart=S.cart.filter(l=>C.indexOf(l)<0); S.note=PREFS&&PREFS.note||"";
     S.open.add(o.id); S.oFilter="live";
     closeSheet(); syncBadge(); go("orders");
     toast(`訂單 ${o.id} 已送出，小幫手確認後計入對帳單`,2800);
@@ -1873,7 +2009,8 @@ function wishForm(kind,pre){
   openSheet({photo:"傳照片許願",link:"貼連結許願",text:"文字許願"}[kind],
    `${f}
     <div class="field"><label>數量</label><input id="wq" type="number" value="1" min="1" max="20" inputmode="numeric"></div>
-    <div class="field"><label>備註（顏色、尺寸、預算上限）</label><input id="wn" placeholder="選填"></div>
+    <div class="field"><label>備註（顏色、尺寸）</label><input id="wn" placeholder="選填"></div>
+    <details class="fold" style="margin:4px 0 12px"><summary>🎯 設定預算（選填）</summary><div class="foldbody">${budgetFields(null,null)}</div></details>
     <label class="pubchk"><input type="checkbox" id="wpub">
       <span><b class="sm">公開到許願牆，讓大家一起 +1</b>
       <span class="tiny dim" style="display:block;line-height:1.6;margin-top:2px">店家看過才會公開，不會顯示你的名字和備註。想要的人越多，越有機會開成喊單。</span></span></label>
@@ -1901,10 +2038,12 @@ async function submitWish(kind){
   if(kind==="link"&&!/^https?:\/\//.test(src)){toast("請貼上完整網址，需以 http(s):// 開頭");return;}
   const q=Math.max(1,parseInt($("#wq").value||"1",10)),note=$("#wn").value.trim(),pub=!!($("#wpub")&&$("#wpub").checked);
   const pname=kind==="photo"&&$("#wname")?$("#wname").value.trim().slice(0,60):"";
+  const bud=readBudget(); if(!bud) return;
   const w={id:"W-"+(105+DB.wishes.length),src:{photo:"照片",link:"連結",text:"文字"}[kind],
     title:kind==="link"?"商品連結":kind==="text"?src.slice(0,28):(pname||"照片許願"),
     raw:src,note,qty:q,st:"parsing",at:now().split(" ")[0],img:kind==="photo"?_wishImg:null,
-    file:kind==="photo"?_wishFile:null,wall:pub?"pending":"private",votes:0,bcNo:null};
+    file:kind==="photo"?_wishFile:null,wall:pub?"pending":"private",votes:0,bcNo:null,
+    budget:bud.auto_buy_max!=null||bud.reject_above!=null?{auto_buy_max:bud.auto_buy_max,reject_above:bud.reject_above,rule_text:budgetText(bud.auto_buy_max,bud.reject_above)}:null,dec:null};
   let data=kind==="photo"?w.img:undefined;
   if(kind==="photo"&&!CFG.mock){
     try{ data=await shrinkImage(_wishRaw); w.file=jpgName(w.file); }
@@ -1913,8 +2052,10 @@ async function submitWish(kind){
   DB.wishes.unshift(w);_wishImg=null;_wishFile=null;_wishRaw=null;closeSheet();go("wish");
   toast(CFG.mock?"許願已送出，辨識中…":"許願已送出，小幫手報價後可以在「許願」頁查看",2600);
   API.wishCreate({src:kind,item_name:kind==="text"?src:(pname||undefined),ref_url:kind==="link"?src:undefined,
-      quantity:q,note,file_name:w.file,data,public:pub||undefined})
-    .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(!CFG.mock){ w.title=r.item_name; if(r.wall_status) w.wall=r.wall_status; if(r.picture) w.img=r.picture; } } })
+      quantity:q,note,file_name:w.file,data,public:pub||undefined,
+      auto_buy_max:bud.auto_buy_max!=null?bud.auto_buy_max:undefined,reject_above:bud.reject_above!=null?bud.reject_above:undefined})
+    .then(r=>{ if(r&&r.wish_id){ w.id=r.wish_id; if(r.my_budget!==undefined) w.budget=r.my_budget;
+      if(!CFG.mock){ w.title=r.item_name; if(r.wall_status) w.wall=r.wall_status; if(r.picture) w.img=r.picture; } render(); } })
     .catch(()=>{ DB.wishes=DB.wishes.filter(x=>x!==w); render(); });
   if(!CFG.mock) return;                             // 正式模式由店家在後台報價，不模擬
   await wait(4000);
@@ -1957,7 +2098,9 @@ function wishPlus(id){
   const on=!b.voted, prev={voted:b.voted,votes:b.votes,wants:b.wants};
   b.voted=on; b.votes+=on?1:-1; b.wants+=on?1:-1; render();
   toast(on?"已 +1，開成喊單時會用 LINE 通知你":"已取消 +1");
-  API.wishPlus(id,on).then(r=>{ if(r){ b.voted=!!r.voted; b.votes=r.votes; b.wants=r.wants; render(); } })
+  if(!on){ b.budget=null; b.dec=null; }
+  API.wishPlus(id,on).then(r=>{ if(r){ b.voted=!!r.voted; b.votes=r.votes; b.wants=r.wants;
+      if(r.my_budget!==undefined) b.budget=r.my_budget; render(); } })
     .catch(e=>{ Object.assign(b,prev);
       if(e.code==="NOT_FOUND") DB.board=DB.board.filter(x=>x!==b);
       if(e.code==="OWN_WISH") b.mine=true;
@@ -1981,6 +2124,71 @@ function wishShare(id){
     .catch(e=>{ w.wall=e.code==="HIDDEN_BY_SHOP"?"hidden":prev; render(); });
 }
 /* 牆上看得懂的卡片：沒照片又只叫「照片許願」的，別人看不出是什麼，不顯示（自己的照樣顯示） */
+/* 許願預算（合約 37～40）：預算只有自己看得到；rule_text 直接顯示 */
+function budgetText(a,r){
+  const nt=n=>"NT$"+Number(n).toLocaleString("en-US");
+  return [a!=null?`報價 ≤ ${nt(a)} 自動幫你買`:"",r!=null?`超過 ${nt(r)} 自動略過`:"",a!=null&&r!=null?"中間的會問你":"其他的會問你"].filter(Boolean).join("；");
+}
+function budgetBlock(x){
+  if(!x) return "";
+  const id=jsq(x.id), d=x.dec;
+  return `<div class="budget" data-budget="${esc(x.id)}">
+      <div class="row"><span class="rule">${x.budget?`🎯 ${esc(x.budget.rule_text||"")}`:`🎯 <span class="dim">還沒設預算：設了之後，報價在範圍內會自動幫你保留</span>`}</span>
+        <button class="btn quiet sm" style="flex:none" onclick="budgetSheet('${id}')">${x.budget?"改預算":"設預算"}</button></div></div>
+    ${d?`<div class="decide" data-dec="${esc(x.id)}"><b class="sm">${esc(d.decision_zh||"")}</b>
+      <span class="tiny dim">・報價 NT$${nf(d.quote_twd)}・${esc(d.status_zh||"")}</span>
+      ${d.can_decide?`<div class="row"><button class="btn primary sm" style="flex:1" onclick="wishDecide('${id}',true)">要，放進購物車</button>
+          <button class="btn quiet sm" style="flex:1" onclick="wishDecide('${id}',false)">這次不要</button></div>`:""}
+      ${d.can_cancel?`<div class="row"><button class="btn quiet sm" onclick="wishAutoCancel('${id}')">取消自動保留</button>
+          <span class="tiny dim" style="flex:1">付款前都可以取消</span></div>`:""}</div>`:""}`;
+}
+function budgetFields(a,r){
+  return `<div class="bgrid">
+      <div class="field" style="margin:0"><label>報價 ≤ 這個數 自動幫我買</label><input id="ba" type="number" min="1" inputmode="numeric" placeholder="例 800" value="${a!=null?a:""}"></div>
+      <div class="field" style="margin:0"><label>報價 > 這個數 自動不要</label><input id="br" type="number" min="1" inputmode="numeric" placeholder="例 1000" value="${r!=null?r:""}"></div></div>
+    <p class="tiny dim" style="line-height:1.7;margin:8px 0 0">設定預算後，報價在範圍內會自動幫你保留，付款前都可以取消。中間的會先問你。預算只有你看得到。</p>`;
+}
+function readBudget(){
+  const n=v=>{ v=String(v||"").trim(); return v===""?null:Math.round(Number(v)); };
+  const a=n($("#ba")&&$("#ba").value), r=n($("#br")&&$("#br").value);
+  if((a!=null&&!(a>0))||(r!=null&&!(r>0))){ toast("預算要大於 0"); return false; }
+  if(a!=null&&r!=null&&a>r){ toast("「自動買」的金額不能比「自動不要」高"); return false; }
+  return {auto_buy_max:a,reject_above:r};
+}
+function findWishAny(id){ return DB.wishes.find(x=>x.id===id)||DB.board.find(x=>x.id===id)||null; }
+function eachWish(id,fn){ [DB.wishes.find(x=>x.id===id),DB.board.find(x=>x.id===id)].forEach(x=>{ if(x) fn(x); }); }
+function budgetSheet(id){
+  const x=findWishAny(id); if(!x) return; const b=x.budget||{};
+  openSheet("許願預算",`<p class="sm" style="margin-top:0;line-height:1.7"><b>${esc(x.title)}</b></p>${budgetFields(b.auto_buy_max,b.reject_above)}`,
+    `<button class="btn primary block" onclick="saveBudget('${jsq(id)}')">儲存預算</button>
+     ${x.budget?`<button class="btn quiet block" style="margin-top:8px" onclick="saveBudget('${jsq(id)}',true)">清掉預算</button>`:""}`);
+}
+async function saveBudget(id,clear){
+  const v=clear?{auto_buy_max:null,reject_above:null}:readBudget(); if(!v) return;
+  if(!clear&&v.auto_buy_max==null&&v.reject_above==null){ toast("至少填一個數字，或按「清掉預算」"); return; }
+  try{
+    const r=await API.wishBudget(id,v.auto_buy_max,v.reject_above);
+    eachWish(id,x=>{ x.budget=r&&r.my_budget||null; if(r&&"my_decision" in r) x.dec=r.my_decision||null; });
+    closeSheet(); render(); toast(clear?"已清掉預算":"預算已儲存");
+  }catch(_){}
+}
+async function wishDecide(id,accept){
+  try{
+    const r=await API.wishDecide(id,accept);
+    eachWish(id,x=>{ x.dec=r&&r.my_decision||x.dec; });
+    if(r&&r.cart_item){ const l=M.cart(r.cart_item); if(!S.cart.some(c=>c.cid===l.cid)) S.cart.push(l); syncBadge(true); }
+    render(); toast(accept?"已放進購物車":"好的，這次不買");
+  }catch(_){}
+}
+async function wishAutoCancel(id){
+  try{
+    const r=await API.wishAutoCancel(id);
+    eachWish(id,x=>{ x.dec=r&&r.my_decision||Object.assign({},x.dec,{can_cancel:false,status:"cancelled",status_zh:"已取消"}); });
+    if(!CFG.mock){ try{ S.cart=(await API.cartList()).map(M.cart); DB.wishes=(await API.wishList()).map(M.wish); }catch(_){} }
+    else { const d=findWishAny(id); S.cart=S.cart.filter(l=>!(l.src==="wish"&&l.ref===id)); }
+    syncBadge(); render(); toast("已取消自動保留");
+  }catch(_){}
+}
 /* 店家寫給客人看的尋找進度（後端 018）：沒寫就不顯示 */
 function progLine(x){ return x&&x.prog?`<div class="prog tiny">🔎 店家：${esc(x.prog)}${x.progAt?`・${fmtDate(x.progAt)}`:""}</div>`:""; }
 function wallRows(){ return DB.board.filter(b=>b.mine||b.img||b.title!=="照片許願"); }
@@ -2465,7 +2673,10 @@ function vCart(){
       <button class="opt ${S.inv==="donate"?"on":""}" onclick="setInv('donate')">捐贈<br><span class="tiny dim">社福機構</span></button>
       <button class="opt ${S.inv==="tax"?"on":""}" onclick="setInv('tax')">統編<br><span class="tiny dim">公司報帳</span></button></div>
       ${S.inv==="carrier"?`<button class="link" style="margin-top:6px" onclick="editCarrier()">修改載具號碼</button>`:""}
-      ${S.inv==="tax"?`<input style="margin-top:8px" maxlength="8" inputmode="numeric" placeholder="8 碼統一編號" value="${esc(S.taxId)}" oninput="S.taxId=this.value.replace(/\D/g,'')">`:""}</div>
+      ${S.inv==="tax"?`<input style="margin-top:8px" maxlength="8" inputmode="numeric" placeholder="8 碼統一編號" value="${esc(S.taxId)}" oninput="S.taxId=this.value.replace(/\D/g,'')">
+        <input style="margin-top:8px" maxlength="60" placeholder="公司抬頭（選填）" value="${esc(S.company||"")}" oninput="S.company=this.value">`:""}
+      ${S.inv==="donate"?`<input style="margin-top:8px" maxlength="7" inputmode="numeric" placeholder="捐贈碼（選填，3～7 位數字）" value="${esc(S.donate||"")}" oninput="S.donate=this.value.replace(/\D/g,'')">`:""}
+      ${PREFS?`<button class="link" style="margin-top:6px;display:block" onclick="prefsSheet()">結帳偏好：${esc((PREFS.payway_zh||"")+(PREFS.note?"・"+PREFS.note:""))||"設定"} ›</button>`:""}</div>
     <div class="field"><label>訂單備註</label>
       <input placeholder="選填，例：包裝低調一點" value="${esc(S.note)}" oninput="S.note=this.value"></div>
     <div class="sumbox">
@@ -2652,7 +2863,7 @@ function vWall(){
         :b.mine?`<div class="row" style="gap:8px"><div class="tiny dim" style="flex:1;text-align:center;padding:7px 0;border:1px dashed var(--line);border-radius:9px">⭐ 我許的</div>
             <button class="btn quiet sm" style="flex:none" onclick="shareWish('${jsq(b.id)}')">📤 找朋友 +1</button></div>`
         :`<button class="btn ${b.voted?"quiet":"primary"} sm block" onclick="wishPlus('${jsq(b.id)}')">${b.voted?"✓ 已 +1，再按取消":"🙋 我也想要 +1"}</button>`}
-      </div></div>`).join("")+`</div><div class="trunk" aria-hidden="true"></div>
+      </div>${b.mine||b.voted?budgetBlock(b):""}</div>`).join("")+`</div><div class="trunk" aria-hidden="true"></div>
       <div class="woodsign">HEEEHABABY ♡ 我幫你保管每一個小心願 ♡</div></div>`
     :`<div class="empty" style="padding:30px 10px"><div style="font-size:36px">🌱</div>
         <h3>許願牆還是空的</h3><p>許願時勾「公開到許願牆」，店家看過就會出現在這裡。</p>
@@ -2687,6 +2898,7 @@ function vWishMine(){
           <span class="pill ${s.c}" style="flex:none">${s.t}</span></div>
         <div class="tiny dim" style="margin-top:7px">${s.d}${w.orderId?`（${w.orderId}）`:""}</div>
         ${progLine(w)}
+        ${budgetBlock(w)}
         ${w.st==="quoted"?`<div class="between" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
           <div><span class="tiny dim">報價</span>
             <span style="font-weight:900;font-size:16px;color:var(--pine-deep);margin-left:6px">NT$${nf(w.quote)} / 件</span>
@@ -2937,7 +3149,7 @@ async function shipCancel(id){
 }
 
 /* ---------- 站內通知中心（合約 34～36） ---------- */
-var NOTIF_ICON={bought:"🛍️",quoted:"💬",out_of_stock:"😢",transfer_verified:"💰",payment_received:"💰",statement:"🧾",
+var NOTIF_ICON={wish_auto:"🎯",bought:"🛍️",quoted:"💬",out_of_stock:"😢",transfer_verified:"💰",payment_received:"💰",statement:"🧾",
   payment_reminder:"⏰",ship_request:"📦",shipped:"🚚",arrived:"📬",wish_broadcast:"📣"};
 async function openInbox(){
   openSheet("通知",`<div id="inboxBody"><div class="sm dim" style="padding:20px 0;text-align:center">載入中…</div></div>`,
@@ -3014,7 +3226,9 @@ function vStmt(){
       <div class="tiny dim">每一次結算、付款和發票紀錄都在這裡</div></div></div>
     ${unbilled.length?`<div class="alert gold">
       <b>尚未結算 ${unbilled.length} 筆・NT$${nf(sum)}</b><br>
-      ${SHOP.nextStmt?`下次結算日 <b>${esc(SHOP.nextStmt)}</b>，`:"每月 15 日、月底結算，"}結算後會推播對帳單給你。</div>`:""}
+      ${SHOP.nextStmt?`下次結算日 <b>${esc(SHOP.nextStmt)}</b>，`:"每月 15 日、月底結算，"}結算後會推播對帳單給你。
+      <div class="row" style="margin-top:8px;gap:8px"><button class="btn primary sm" onclick="earlyAsk()">現在就結帳</button>
+        <span class="tiny" style="flex:1">不想等月結，可以先開一張對帳單付款</span></div></div>`:""}
     ${DB.stmts.map(t=>`<div class="order" style="padding:14px;margin-top:11px">
       <div class="between">
         <div><div class="oid">${t.id}</div>
@@ -3031,7 +3245,7 @@ function vStmt(){
           <span>${o?`NT$${nf(o.total)}`:""}</span></div>`;}).join("")}
       ${t.pay==="已核對"
         ? `<div class="tiny dim" style="margin-top:8px">${t.paidAt} 完成・
-             ${t.payway?PAYWAY[t.payway].t:""}${t.last5?"・後五碼 "+t.last5:""}${t.tradeNo?"・"+t.tradeNo:""}</div>
+             ${t.payway?PAYWAY[t.payway].t:""}${t.last5?"・後五碼 "+t.last5:""}${t.tradeNo?"・"+t.tradeNo:""}${t.proof?"・已附截圖":""}</div>
            ${t.inv?`<div class="invbox">
              <div class="between"><b class="sm">電子發票</b>
                <span class="pill ${INV_ST[t.inv.st].c}">${INV_ST[t.inv.st].t}</span></div>
@@ -3074,8 +3288,7 @@ function payStmt(sid){
 
     <div class="h2" style="margin:18px 0 8px">發票</div>
     <div class="sumbox">
-      <div class="sumrow"><span>開立方式</span><span>${S.inv==="carrier"?"手機載具 "+esc(DB.me.carrier)
-        :S.inv==="donate"?"捐贈發票":"統一編號 "+esc(S.taxId||"未填")}</span></div>
+      <div class="sumrow"><span>開立方式</span><span>${esc(invText())}</span></div>
       <div class="sumrow"><span>開立時機</span><span>付款完成後開立</span></div></div>
     <button class="link" style="margin-top:8px" onclick="closeSheet();go('cart')">要改發票設定，到購物車調整</button>
 
@@ -3087,7 +3300,7 @@ function setPayway(k){ S.payway=k; if(S._sid) payStmt(S._sid); }
 async function doPay(sid){
   const t=DB.stmts.find(x=>x.id===sid), w=S.payway;
   let r;
-  try{ r=await API.payInit(sid,w,{type:S.inv,carrier:DB.me.carrier,tax_id:S.taxId}); }
+  try{ r=await API.payInit(sid,w,invBody()); }
   catch(e){
     // 線上付款還沒開通（金鑰未設定，或測試環境只開放店家帳號）：引導改用銀行轉帳
     if(e.code==="NOT_CONFIGURED"){ S.payway="bank"; payStmt(sid);
@@ -3104,10 +3317,12 @@ async function doPay(sid){
         ${SHOP.bankHolder?`戶名 ${esc(SHOP.bankHolder)}・`:""}金額 NT$${nf(t.total)}</div>
       <div class="field" style="margin-top:12px"><label>轉出帳號後五碼</label>
         <input id="l5" maxlength="5" inputmode="numeric" placeholder="例如 31007"></div>
-      <button class="btn primary block" onclick="submitFive('${sid}')">送出後五碼</button>
-      ${CFG.mock?`<label class="drop" style="display:block;cursor:pointer;margin-top:10px">
-        <b>或上傳轉帳截圖</b><div class="tiny dim">系統自動辨識金額與後五碼</div>
-        <input type="file" accept="image/*" style="display:none" onchange="onStmtFile(event,'${sid}')"></label>`:""}`;
+      <label class="drop" style="display:block;cursor:pointer;margin-bottom:10px">
+        <b>附上轉帳截圖（選填）</b><div class="tiny dim">只有店家看得到，對帳比較快</div>
+        <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onProof(event)"></label>
+      <div id="proofpv"></div>
+      <button class="btn primary block" onclick="submitFive('${sid}')">送出後五碼</button>`;
+    S._proof=null;
     return;
   }
   if(w==="atm"){
@@ -3140,41 +3355,45 @@ async function doPay(sid){
     postForm(r.redirect,r.fields);               // 正式版以表單 POST 導向綠界
   }
 }
+/* 提前結帳（合約 41）：已報價以上、還沒進對帳單的訂單現在就開一張 */
+function earlyAsk(){
+  const os=DB.orders.filter(o=>!o.stmt&&o.st>=1&&!o.exception), sum=os.reduce((a,o)=>a+o.total,0);
+  openSheet("提前結帳",`<div class="alert gold" style="margin-top:0">會把 <b>${os.length}</b> 筆訂單（NT$${nf(sum)}）現在就開成一張對帳單。</div>
+    <p class="sm" style="line-height:1.8">開出來後一樣會收到對帳單通知，請在 ${SHOP.payDeadlineDays} 天內付款，超過會提醒你一次。</p>`,
+    `<button class="btn primary block" onclick="doEarly()">開對帳單</button>`);
+}
+async function doEarly(){
+  try{
+    const r=await API.stmtEarly(); const t=M.stmt(r);
+    DB.stmts=[t].concat(DB.stmts.filter(x=>x.id!==t.id));
+    if(CFG.mock) t.orders.forEach(oid=>{ const o=DB.orders.find(x=>x.id===oid); if(o) o.stmt=t.id; });
+    else { try{ DB.orders=(await API.orderList()).map(M.order); }catch(_){} }
+    closeSheet(); S.oFilter="stmt"; render(); toast(`已開出對帳單 ${t.id}`,2600);
+  }catch(e){ if(e&&e.code==="NOTHING_TO_BILL") closeSheet(); }
+}
 /* 銀行轉帳：回報後五碼 → 待官方確認（由後端比對入帳） */
 function submitFive(sid){
   const v=($("#l5")&&$("#l5").value.trim())||"";
   if(!/^\d{5}$/.test(v)){ toast("請輸入 5 碼數字"); return; }
-  const t=DB.stmts.find(x=>x.id===sid); const prev={pay:t.pay,last5:t.last5,payway:t.payway};
-  t.last5=v; t.pay="待官方確認"; t.payway="bank";
-  closeSheet(); render(); toast("已回報，核對完成後對帳單會顯示「已核對」",2600);
-  API.reportTransfer(sid,v).catch(()=>{ Object.assign(t,prev); render(); });
+  const t=DB.stmts.find(x=>x.id===sid); const prev={pay:t.pay,last5:t.last5,payway:t.payway,proof:t.proof};
+  const shot=S._proof; S._proof=null;
+  t.last5=v; t.pay="待官方確認"; t.payway="bank"; if(shot) t.proof=true;
+  closeSheet(); render(); toast("已回報，店家對到入帳後對帳單會顯示「已核對」",2600);
+  API.reportTransfer(sid,v,shot||undefined).then(r=>{ if(r&&r.statement_id){ Object.assign(t,M.stmt(r)); render(); } })
+    .catch(()=>{ Object.assign(t,prev); render(); });
 }
-function onStmtFile(ev,sid){
-  const f=ev.target.files&&ev.target.files[0]; if(!f)return;
-  const err=checkFile(f); if(err){ toast(err); ev.target.value=""; return; }
-  const name=sysName("payment",f);
-  const t=DB.stmts.find(x=>x.id===sid), r=new FileReader();
-  r.onload=async e=>{
-    const l5=($("#l5")&&$("#l5").value.trim())||String(Math.floor(10000+Math.random()*89999));
-    $("#payzone").innerHTML=`<div class="row" style="margin-top:12px;align-items:flex-start">
-      <img class="zoomable" src="${e.target.result}" onclick="lightbox('img',this.src,'轉帳截圖')"
-        style="width:78px;height:78px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
-      <div style="flex:1;min-width:0">
-        <div class="tiny" id="ocrmsg"><span class="spin"></span> 上傳中…</div></div></div>
-      ${upInfo("payment",f,name)}`;
-    await wait(700);
-    $("#ocrmsg").innerHTML=`<span class="spin"></span> 辨識中…`;
-    await wait(1500);
-    $("#ocrmsg").innerHTML=`<span class="spin"></span> 比對金額 NT$${nf(t.total)}…`;
-    await wait(1300);
-    $("#ocrmsg").innerHTML=`<span style="color:var(--pine);font-weight:700">✓ 核對成功・後五碼 ${l5}</span>`;
-    t.last5=l5; t.pay="已核對"; t.paidAt=now(); t.img=e.target.result; t.file=name;
-    t.orders.forEach(oid=>{const o=DB.orders.find(x=>x.id===oid); if(o)o.pay="已核對";});
-    await wait(900); closeSheet(); render(); toast("付款已核對完成",2600);
-  };
-  r.readAsDataURL(f);
+/* 匯款截圖（合約 25，v1.8）：縮成 JPG data URL，3 MB 內 */
+async function onProof(ev){
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  if(!/^image\/(jpeg|png|webp)$/.test(f.type)){ toast("請選 JPG、PNG 或 WebP 圖片"); ev.target.value=""; return; }
+  try{
+    const data=CFG.mock?await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(f); }):await shrinkImage(f);
+    if(data.length*0.75>3*1024*1024){ toast("截圖太大了，請裁小一點再傳（3 MB 內）"); return; }
+    S._proof=data;
+    const el=$("#proofpv"); if(el) el.innerHTML=`<div class="proofrow"><img src="${data}" alt="轉帳截圖"><div class="tiny"><b>已附上截圖</b><br><span class="dim">送出後五碼時一起送給店家</span></div>
+      <button class="link" onclick="S._proof=null;this.closest('.proofrow').remove()">拿掉</button></div>`;
+  }catch(e){ toast(e.message||"截圖讀不出來，請換一張"); }
 }
-
 function vMe(){
   const N=DB.me.notify;
   const mine=DB.orders;
@@ -3228,6 +3447,8 @@ function vMe(){
         <span><span style="font-weight:500">代購須知</span><br><span class="tiny dim">價格、缺貨、拆單、取貨與結算規則</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="openInbox()"><span style="font-size:17px">🔔</span>
         <span><span style="font-weight:500">通知中心</span><br><span class="tiny dim">${INBOX.unread?`${INBOX.unread} 則未讀`:"報價、收款、缺貨、出貨申請、對帳單"}</span></span><span class="ar">›</span></button>
+      <button class="mrow" onclick="prefsSheet()"><span style="font-size:17px">🧾</span>
+        <span><span style="font-weight:500">結帳偏好</span><br><span class="tiny dim">${PREFS?esc([PREFS.payway_zh,PREFS.pickup&&PREFS.pickup.text,PREFS.note].filter(Boolean).join("・")||"還沒設定"):"付款方式、取貨、發票、特殊備註"}</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="staffJoin()"><span style="font-size:17px">🪪</span>
         <span><span style="font-weight:500">我是小幫手</span><br><span class="tiny dim">輸入店家給的邀請碼</span></span><span class="ar">›</span></button>
       <button class="mrow" onclick="support()"><span style="font-size:17px">💬</span>
