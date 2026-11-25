@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#fffcf7">
+<meta name="theme-color" content="#fbf4e8">
 <title>HEEEHABABY 日本代購</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -300,6 +300,7 @@ background-size:400% 100%;animation:sk 1.2s ease infinite;border-radius:8px}
   .topbar{padding:12px max(28px,calc((100% - 1120px)/2 + 28px));background:rgba(255,255,255,.96);
     border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2) blur(6px)}
   .topbar .iconbtn{display:none}
+  .topbar .iconbtn.cartbtn{display:grid;order:9;margin-left:auto}
   .topbar .tabs{position:static;transform:none;width:auto;max-width:none;height:auto;background:none;border:none;
     display:flex;gap:4px;margin-left:36px;padding:0;grid-template-columns:none}
   .topbar .tab{flex-direction:row;gap:7px;font-size:14.5px;padding:9px 15px;border-radius:10px;color:var(--ink-2)}
@@ -379,67 +380,130 @@ body.guest .tabs,body.guest .topbar .iconbtn{display:none!important}
 .splash .mark{font-weight:900;letter-spacing:.14em;color:var(--pine);font-size:15px}
 .splash .spin{width:22px;height:22px}
 
-/* =================== 周小姐樣板換皮（2026-11） ===================
-   只換外觀：色票、字體、品牌列、浮動膠囊選單、頁首、許願樹。功能不動。 */
-:root{--paper:#FAF8F4;--surface:#FFF;--surface-2:#FBFAF6;--ink:#354332;--ink-2:#5B6555;--ink-3:#73786C;
---line:#E8E8DD;--line-soft:#EFEFE6;--pine:#52654B;--pine-soft:#E8EDC6;--pine-deep:#3D4C38;
---gold:#7E6534;--gold-soft:#FFF8ED;--beni:#B4553E;--beni-soft:#F7E3DA;
---peach:#F3D9CB;--lilac:#E8E2F2;--soft:#F0F2E7;--butter:#F6E6A8;--tab-h:64px;--nav-gap:17px}
-body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",system-ui,sans-serif;font-size:14px}
-/* 品牌列 */
-.brand{display:flex;align-items:center;gap:8px;color:var(--ink)}
+/* =================== 周小姐影片版外觀（2026-11-25） ===================
+   取代 11/19 的橄欖綠換皮。只換外觀：色票、紋路、磚紅按鈕、蜜桃照片喊單卡、價格膠囊、插畫位置、許願樹、6 格選單。功能不動。
+   插畫檔：assets/mascot-dog.png、mascot-bunny.png、mascot-bear.png、tree.png（沒有檔案時自動用淡色圓形＋emoji）。 */
+:root{--paper:#FBF4E8;--surface:#FFFDF8;--surface-2:#FBF6EC;--ink:#4D4639;--ink-2:#655D4E;--ink-3:#776E5E;
+--line:#EADFCA;--line-soft:#F1E8D6;--pine:#88362A;--pine-soft:#E7ECD6;--pine-deep:#6B2A20;
+--gold:#4F3205;--gold-soft:#FDF0D2;--beni:#A8432F;--beni-soft:#F8E1D6;
+--title:#565042;--peach:#F8E2C5;--peach-line:#EFCFA8;--tape:#D5E5C4;--price:#F6DB96;--price-ink:#4F3205;
+--soft:#E7ECD6;--soft-ink:#3F5333;--treebg:#F5F4E3;--navbg:#FFF9EB;--navon:#D8E5CB;--butter:#F5D075;
+--tab-h:66px;--nav-gap:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",system-ui,sans-serif;font-size:14px;
+background-color:var(--paper);background-image:radial-gradient(#EADBC0 1.1px,transparent 1.4px);background-size:18px 18px}
+.phone{background:transparent}
+/* 頁首：品牌＋鈴鐺＋購物車，下面一條虛線 */
+.topbar{background:rgba(251,244,232,.94);border-bottom:1.5px dashed #E3D2B3}
+.topbar.stuck{border-bottom-color:#E3D2B3}
+.brand{display:flex;align-items:center;gap:8px;color:var(--title)}
 .brand .flower{flex:none}
-.bname{font-size:28px;font-weight:850;letter-spacing:-1.3px;line-height:1;color:var(--ink)}
+.bname{font-size:28px;font-weight:850;letter-spacing:-1.3px;line-height:1;color:var(--title)}
 .bname small{display:block;font-size:9px;font-weight:500;letter-spacing:1.1px;white-space:nowrap;color:var(--ink-3);margin-top:5px;line-height:1.2}
-.iconbtn{background:#fff;border:1px solid var(--line)}
-/* 按鈕與卡片 */
-.btn{border-radius:11px;min-height:43px}
-.btn.sm{min-height:36px}
-.btn.quiet{background:#fff;border:1px solid var(--line);color:var(--ink)}
-.btn.ghost{border-color:var(--pine);color:var(--pine)}
-.addbtn{background:var(--soft);color:var(--pine-deep)}
-.card,.list,.wish,.livecard,.sumbox,.ecard,.profile,.menu,.stat,.wishbtn,details.fold,.payopt{
-border-radius:18px;border-color:var(--line);box-shadow:0 1px 3px rgba(53,67,50,.04)}
-.trip,.livehero{border-radius:22px}
-.livecard .ph,.livecard .lthumb{background:var(--peach)}
-.chip.on{background:var(--pine);border-color:var(--pine)}
-.seg{background:var(--soft)}
-.alert.gold{border:1px solid #F0E6D4}
-/* 頁首：小號英文＋大標＋灰字 */
+.iconbtn{background:#FFFDF8;border:1px solid var(--line)}
+.iconbtn+.iconbtn{margin-left:6px}
+.cartbtn.on{background:var(--navon)}
+/* 標題 */
+.h2,.phead h1,.sechead h2,.pcard h2{color:var(--title)}
+.h2{font-weight:850}
 .phead{margin:18px 0 14px}
 .phead .eyebrow{font-size:10.5px;letter-spacing:2px;color:var(--ink-3);font-weight:700}
-.phead h1{margin:4px 0 2px;font-size:24px;font-weight:850;letter-spacing:-.5px;line-height:1.3;color:var(--ink)}
-.phead p{margin:0;font-size:13px;color:var(--ink-3);line-height:1.6}
+.phead h1{margin:4px 0 2px;font-size:24px;font-weight:850;letter-spacing:-.5px;line-height:1.3}
+.phead p{margin:6px 0 0;font-size:13px;color:var(--ink-3);line-height:1.65}
+/* 按鈕：磚紅主按鈕有厚度 */
+.btn{border-radius:12px;min-height:43px}
+.btn.sm{min-height:36px}
+.btn.primary{background:var(--pine);color:#fff;box-shadow:0 3px 0 #5E2218}
+.btn.primary:active{transform:translateY(2px);box-shadow:0 1px 0 #5E2218}
+.btn.quiet{background:#FFFDF8;border:1px solid var(--line);color:var(--ink)}
+.btn.ghost{border-color:var(--pine);color:var(--pine)}
+.btn.soft{background:var(--soft);color:var(--soft-ink);border:1px solid #D6DFC0}
+.addbtn{background:var(--soft);color:var(--soft-ink)}
+.pill.pine{background:var(--soft);color:var(--soft-ink)}
+.chip.on{background:var(--pine);border-color:var(--pine)}
+.seg{background:#F1E8D6}
+.seg button.on{color:var(--pine)}
+.sw.on{background:var(--soft-ink)}
+/* 卡片 */
+.card,.list,.wish,.livecard,.sumbox,.ecard,.profile,.menu,.stat,.wishbtn,details.fold,.payopt{
+border-radius:18px;border-color:var(--line);background-color:var(--surface);box-shadow:0 1px 3px rgba(86,80,66,.05)}
+.trip,.livehero{border-radius:22px}
+.alert.pine{background:var(--soft);color:var(--soft-ink)}
+.alert.gold{background:#FFF8ED;border:1px solid #F0E6D4;color:#6E5A35}
+/* 價格膠囊 */
+.ptag{display:inline-block;align-self:flex-start;background:var(--price);color:var(--price-ink);border:1.5px dashed #C9A355;
+border-radius:10px;padding:3px 10px;font-weight:900;font-size:15px;letter-spacing:.3px}
+/* 插畫位置 */
+.mascot{display:inline-grid;place-items:center;flex:none;position:relative}
+.mascot img{width:100%;height:100%;object-fit:contain}
+.mascot i{display:none;font-style:normal;line-height:1}
+.mascot.fb{background:#FBE9CF;border-radius:50%;border:1.5px dashed #E8C99A}
+.mascot.fb i{display:block}
+/* 照片喊單卡：蜜桃底＋淡綠斜紋膠帶 */
+.pcard{position:relative;background:var(--peach);border:1px solid var(--peach-line);border-radius:22px;padding:20px 18px 18px;margin-top:16px;overflow:hidden}
+.pcard::before{content:"";position:absolute;top:10px;left:-14px;width:74px;height:18px;transform:rotate(-32deg);
+background:repeating-linear-gradient(45deg,var(--tape) 0 6px,#E8F0DE 6px 12px);opacity:.95}
+.pcard-body{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.pcard-text{flex:1;min-width:0}
+.pcard h2{margin:0;font-size:22px;font-weight:850}
+.pcard p{margin:4px 0 0;font-size:13px;color:#6E5A43;line-height:1.6}
+/* 區塊標題（插畫＋標題＋右側按鈕） */
+.sechead{display:flex;align-items:center;gap:8px;margin:24px 0 10px}
+.sechead h2{margin:0;font-size:19px;font-weight:850;flex:1}
 /* 許願樹 */
-.tree{position:relative;margin:4px 0 8px}
-.canopy{background:var(--pine-soft);border-radius:44% 44% 30px 30px / 70px 70px 30px 30px;padding:56px 14px 18px;position:relative}
+.tree{position:relative;margin:4px 0 8px;background:var(--treebg);border-radius:22px;padding:16px 12px 14px;overflow:hidden}
+.treeimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9;pointer-events:none}
+.canopy{position:relative;border-radius:46% 46% 34px 34px / 90px 90px 34px 34px;padding:58px 12px 18px;
+background:
+ radial-gradient(circle at 18% 22%,#F2DA7E 0 5px,transparent 6px),
+ radial-gradient(circle at 84% 30%,#F2DA7E 0 5px,transparent 6px),
+ radial-gradient(circle at 60% 12%,#F2DA7E 0 4px,transparent 5px),
+ radial-gradient(circle at 25% 35%,#B9D39C 0 30%,transparent 31%),
+ radial-gradient(circle at 75% 30%,#AFCB90 0 30%,transparent 31%),
+ radial-gradient(circle at 50% 18%,#C4DBA6 0 32%,transparent 33%),
+ #CBE0B0}
 .canopy .wish.wall{position:relative;margin-bottom:22px}
-.canopy .wish.wall::before{content:"";position:absolute;top:-22px;left:50%;width:2px;height:22px;background:#B7A37E}
+.canopy .wish.wall::before{content:"";position:absolute;top:-22px;left:50%;width:2px;height:22px;background:#9C7F57}
 .canopy .wish.wall:first-child::before{top:-30px;height:30px}
 .canopy .wish.wall:last-child{margin-bottom:0}
-.trunk{width:46px;height:46px;margin:0 auto;background:#A68B65;border-radius:0 0 8px 8px}
-.woodsign{margin:-4px auto 0;max-width:320px;background:#C9AE84;color:#3B2E1C;border-radius:10px;padding:10px 12px;
-text-align:center;font-size:12.5px;font-weight:700;letter-spacing:.5px;box-shadow:0 2px 0 #A68B65}
-/* 手機：浮動膠囊選單（電腦版仍放頂部，由 placeNav 搬動） */
+.tree.mini .canopy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:52px 12px 16px}
+.leafcard{background:#FFFDF8;border:1px solid var(--line);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.leafcard img,.leafcard .ph{width:100%;aspect-ratio:1/1;border-radius:10px;object-fit:cover;background:var(--surface-2);display:grid;place-items:center;font-size:30px}
+.leafcard .lname{font-size:12.5px;font-weight:700;line-height:1.4;color:var(--title);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.leafcard .lwant{font-size:11.5px;color:var(--soft-ink);font-weight:700}
+.trunk{position:relative;width:46px;height:44px;margin:0 auto;background:#A68456;border-radius:0 0 10px 10px}
+.woodsign{position:relative;margin:-4px auto 0;max-width:320px;background:#C9A878;color:#3B2E1C;border-radius:10px;padding:10px 12px;
+text-align:center;font-size:12.5px;font-weight:700;letter-spacing:.5px;box-shadow:0 3px 0 #9C7F57}
+/* 每日連線＋1：日期分組、兩欄 */
+.livehead h1{font-size:26px}
+.dayhead{font-size:17px;font-weight:850;color:var(--title);margin:18px 0 10px;letter-spacing:.3px}
+.ltgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ltile{display:flex;flex-direction:column;gap:6px;padding:9px;margin:0}
+.ltile .lphoto{aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:var(--peach);display:grid;place-items:center}
+.ltile .lphoto img{width:100%;height:100%;object-fit:cover;display:block}
+.ltile .lphoto span{font-size:40px}
+.ltile .lname{font-size:13.5px;line-height:1.4;color:var(--title)}
+.ltile .btn{min-height:40px}
+.ltile .link{font-size:12px;padding:2px 0}
+/* 手機：浮動膠囊 6 格選單（電腦版仍放頂部） */
 @media(max-width:859px){
 .phone{padding-bottom:calc(var(--tab-h) + var(--nav-gap) + env(safe-area-inset-bottom) + 36px)}
 .tabs{bottom:calc(var(--nav-gap) + env(safe-area-inset-bottom));width:min(440px,calc(100% - 24px));max-width:none;
-height:var(--tab-h);border-radius:20px;border:1px solid rgba(232,232,221,.9);background:rgba(255,255,255,.82);
--webkit-backdrop-filter:blur(15px);backdrop-filter:blur(15px);box-shadow:0 8px 40px #35433212;
-grid-template-columns:repeat(6,1fr);padding:6px 6px;gap:2px}
-.tab{border-radius:14px;font-size:10.5px;gap:2px;color:var(--ink-3)}
+height:var(--tab-h);border-radius:22px;border:1px solid #EFE2C8;background:rgba(255,249,235,.94);
+-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 8px 32px rgba(86,80,66,.14);
+grid-template-columns:repeat(6,1fr);padding:6px;gap:2px}
+.tab{border-radius:15px;font-size:10px;gap:2px;color:var(--ink-3);white-space:nowrap}
 .tab svg{width:20px;height:20px}
-.tab.on{background:var(--butter);color:var(--ink);font-weight:700}
-.tab.wishtab{background:var(--butter);color:var(--ink);font-weight:700;margin-top:-14px;border:1px solid #EAD68C;
-box-shadow:0 6px 16px rgba(53,67,50,.12)}
-.tab.wishtab.on{background:#F2D97C}
+.tab.on{background:var(--navon);color:var(--soft-ink);font-weight:700}
+.tab.wishtab{background:var(--butter);color:#4F3205;font-weight:800;margin-top:-16px;border:1px solid #E9BE55;
+box-shadow:0 4px 0 #D9A93F,0 8px 16px rgba(86,80,66,.14)}
 .tab .badge{top:2px;right:calc(50% - 18px)}
 .toast{bottom:calc(var(--tab-h) + var(--nav-gap) + env(safe-area-inset-bottom) + 14px)}
 }
 @media(min-width:860px){
-.topbar{background:rgba(255,252,247,.96)}
-.topbar .tab.on{background:var(--butter);color:var(--ink)}
-.topbar .tab.wishtab{background:var(--butter);color:var(--ink)}
+.topbar{background:rgba(251,244,232,.96)}
+.topbar .tab.on{background:var(--navon);color:var(--soft-ink)}
+.topbar .tab.wishtab{background:var(--butter);color:#4F3205}
+.ltgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 </style>
 </head>
@@ -461,7 +525,9 @@ box-shadow:0 6px 16px rgba(53,67,50,.12)}
       <span class="bname">heeehababy<small>LAUGH LIKE A BABY. LIVE LIKE A QUEEN.</small></span></div>
     <div class="spacer"></div>
     <button class="iconbtn" onclick="go('me')" aria-label="通知與我的">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#354332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#565042" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button>
+    <button class="iconbtn cartbtn" data-t="cart" onclick="go('cart')" aria-label="購物車">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#565042" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
       <span class="badge" id="cartBadge" style="display:none">0</span></button>
   </div>
   <main id="view"></main>
@@ -469,15 +535,14 @@ box-shadow:0 6px 16px rgba(53,67,50,.12)}
     <button class="tab" data-t="home" onclick="go('home')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>首頁</button>
     <button class="tab" data-t="live" onclick="go('live')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg>逛連線</button>
-    <button class="tab wishtab" data-t="wish" onclick="go('wish')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 15 9l7 .5-5.3 4.6L18.2 21 12 17.2 5.8 21l1.5-6.9L2 9.5 9 9z"/></svg>許個願
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 4v5M16 4v5"/></svg>逛連線</button>
+    <button class="tab" data-t="wish" onclick="S.wishView='mine';go('wish')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>我的許願
       <span class="badge" id="wishBadge" style="display:none">0</span></button>
-    <button class="tab" data-t="cart" onclick="go('cart')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>購物車
-      <span class="badge" id="tabBadge" style="display:none">0</span></button>
+    <button class="tab wishtab" onclick="wishQuick()" aria-label="許個願">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>許個願</button>
     <button class="tab" data-t="orders" onclick="go('orders')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>訂單
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>我的訂單
       <span class="badge" id="ordBadge" style="display:none">0</span></button>
     <button class="tab" data-t="me" onclick="go('me')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
@@ -731,7 +796,7 @@ function fmtDue(iso){ return iso?fmtTs(iso)+" 前":"期限內"; }
 var M={
   batch:(b)=>({code:b.batch,name:b.name,region:b.region||"",closeAt:new Date(b.close_at),
     buyAt:b.buy_at||"",backAt:b.back_at||"",shipAt:b.ship_at||"",joined:b.joined||0,stage:b.stage||0}),
-  bc:(b)=>({no:b.send_id,n:b.name,e:"🛍️",jpy:b.jpy_taxed,p:b.price_twd,qty:b.quantity,left:b.remaining,
+  bc:(b)=>({day:b.deadline_at?ymdTW(b.deadline_at):"",no:b.send_id,n:b.name,e:"🛍️",jpy:b.jpy_taxed,p:b.price_twd,qty:b.quantity,left:b.remaining,
     deadline:b.open?fmtTs(b.deadline_at):"已截止",note:b.note||"",at:"",hot:false,img:b.image_url||null}),
   cart:(c)=>{ const src=c.source==="reorder"?"text":c.source;
     return {k:"S"+c.cart_id,cid:c.cart_id,src,ref:src==="broadcast"?c.ref:(c.ref||c.cart_id),n:c.name,nja:c.name_ja||"",
@@ -2002,7 +2067,7 @@ function vHome(){
         <br><span class="tiny" style="opacity:.88">${openBC.length} 項可喊・${esc(openBC[0].deadline)} 截止</span></span>
       <span class="ar">›</span></div>
     <div style="height:11px"></div>
-    <div class="lcgrid">${openBC.slice(0,2).map(bcCard).join("")}</div>
+    <div class="ltgrid">${openBC.slice(0,2).map(liveTile).join("")}</div>
     ${openBC.length>2?`<button class="btn quiet block" onclick="go('live')">看全部 ${openBC.length} 項喊單 ›</button>`:""}
     `:`
     <div class="h2">📣 現場連線喊單</div>
@@ -2010,20 +2075,22 @@ function vHome(){
       <div class="sm dim">目前沒有進行中的連線</div>
       <div class="tiny dim" style="margin-top:4px">小幫手開播時會在 LINE 群組公告</div></div>`}
 
+    ${photoShoutCard()}
+    ${homeTree()}
+
     </div><div class="hg-side">
-    <div class="h2">隨時都能下單</div>
+    <div class="h2">也可以這樣下單</div>
     <div class="entry">
-      <button class="ecard" onclick="orderPhoto()">
-        <em>📷</em><b>拍照下單</b><span>看到商品就拍，自動辨識品名與税込価格</span></button>
       <button class="ecard" onclick="orderText()">
         <em>✏️</em><b>文字下單</b><span>知道商品名稱，直接打字最快</span></button>
+      <button class="ecard" onclick="orderPhoto()">
+        <em>📷</em><b>拍照下單</b><span>看到商品就拍，自動辨識品名與税込価格</span></button>
     </div>
     <button class="ecard" style="width:100%;margin-top:11px;flex-direction:row;align-items:center;gap:12px" onclick="go('wish')">
       <em style="margin:0">⭐</em>
       <span style="flex:1"><b style="display:block">許願代找</b>
         <span>不確定日本有沒有貨？寫下來，小幫手到現場幫你找</span></span>
       <span class="ar dim" style="font-size:17px">›</span></button>
-    ${homeWallCard()}
 
     <div class="h2">價目表</div>
     <details class="fold" ${S.open.has("pt")?"open":""} ontoggle="fold('pt',this.open)">
@@ -2289,28 +2356,83 @@ function cartLine(l){
 }
 
 /* ---------- 喊單頁 ---------- */
+/* 插畫角色：assets/ 裡有圖就用，沒有就顯示淡色圓形＋emoji，不破版 */
+function mascot(name,emoji,size){
+  return `<span class="mascot" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.52)}px" aria-hidden="true">`+
+    `<img src="assets/mascot-${name}.png" alt="" onerror="this.parentNode.classList.add('fb');this.remove()"><i>${emoji}</i></span>`;
+}
+function ymdTW(iso){
+  try{ return new Date(iso).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}); }catch(e){ return String(iso).slice(0,10); }
+}
+/* 首頁：照片喊單卡 */
+function photoShoutCard(){
+  return `<section class="pcard">
+    <div class="pcard-body">
+      <div class="pcard-text"><h2>照片喊單</h2>
+        <p>上傳想買的商品照片，交給連線小幫手</p></div>
+      ${mascot("dog","🐶",84)}
+    </div>
+    <button class="btn primary block" onclick="orderPhoto()">＋ 上傳照片喊單</button>
+  </section>`;
+}
+/* 首頁：大家的許願樹（最多 4 則） */
+function homeTree(){
+  const rows=wallRows().slice(0,4);
+  return `<div class="sechead">${mascot("bunny","🐰",34)}<h2>大家的許願樹</h2>
+      <button class="btn soft sm" onclick="wishQuick()">＋許個願</button></div>
+    <div class="tree mini" onclick="openWall()" style="cursor:pointer">
+      <img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()">
+      <div class="canopy">${rows.length?rows.map(b=>`<div class="leafcard">
+          ${b.img?`<img src="${b.img}" alt="" onerror="imgExpired()">`:`<div class="ph">⭐</div>`}
+          <span class="lname">${esc(b.title)}</span><span class="lwant">🙋 ${b.wants}</span></div>`).join("")
+        :`<p class="tiny" style="grid-column:1/-1;text-align:center;margin:8px 0">還沒有人把願望掛上來，第一個許願吧 🌱</p>`}</div>
+      <div class="trunk" aria-hidden="true"></div>
+      <div class="woodsign">HEEEHABABY ♡ 我幫你保管每一個小心願 ♡</div></div>`;
+}
+/* 許個願（底部中間按鈕）：三種方式 */
+function wishQuick(){
+  openSheet("許個願",`<p class="tiny dim" style="margin:0 0 12px;line-height:1.7">這次沒有的商品，把照片、連結或文字丟進來，小幫手在日本現場幫你找。</p>
+    <div class="wishbar">
+      <button class="wishbtn" onclick="closeSheet();wishForm('photo')"><em>📷</em>傳照片</button>
+      <button class="wishbtn" onclick="closeSheet();wishForm('link')"><em>🔗</em>貼連結</button>
+      <button class="wishbtn" onclick="closeSheet();wishForm('text')"><em>✏️</em>打文字</button></div>`,
+   `<button class="btn quiet block" onclick="closeSheet();openWall()">先看看大家許了什麼</button>`);
+}
+/* 每日連線＋1 的商品卡（兩欄） */
+function liveTile(it){
+  const l=line("broadcast",it.no), got=l?l.q:0, wl=DB.me.waitlist.indexOf(it.no)>=0;
+  const closed=it.deadline==="已截止", sold=it.left<=0;
+  return `<div class="livecard ltile ${sold?"sold":""}">
+    ${it.img?`<div class="lphoto zoomable" onclick="lightbox('img','${jsq(it.img)}','${jsq(it.n)}')">
+        <img src="${esc(it.img)}" alt="${esc(it.n)}" loading="lazy" onerror="imgExpired()"></div>`
+      :`<div class="lphoto zoomable" onclick="lightbox('emoji','${jsq(it.e)}','${jsq(it.n)}')"><span>${it.e}</span></div>`}
+    <b class="lname">${esc(it.n)}</b>
+    ${it.note?`<span class="tiny dim">${esc(it.note)}</span>`:""}
+    <span class="ptag">NT$ ${nf(it.p)}</span>
+    <span class="tiny dim">${closed?"已截止":sold?"已搶完":`剩 ${it.left} 份・${esc(it.deadline)} 截止`}${got?`・已喊 ${got}`:""}</span>
+    ${closed?`<button class="btn quiet sm block" disabled>已截止</button>`
+      :sold?`<button class="btn quiet sm block" onclick="waitlist('${it.no}')">${wl?"已排候補・取消":"排候補"}</button>`
+      :`<button class="btn primary sm block" onclick="shout('${it.no}',1)">＋1 放入購物車</button>
+        <button class="link" style="align-self:center" onclick="shoutMore('${it.no}')">要多份？</button>`}
+  </div>`;
+}
 function vLive(){
   const mine=S.cart.filter(l=>l.src==="broadcast");
-  const openN=DB.broadcast.filter(b=>b.left>0&&b.deadline!=="已截止").length;
+  const today=ymdTW(new Date().toISOString());
+  const days={}; DB.broadcast.forEach(b=>{ const d=b.day||today; (days[d]=days[d]||[]).push(b); });
+  const order=Object.keys(days).sort().reverse();
   return `<div class="wrap">
-    ${pageHead("LIVE FROM JAPAN","逛連線","小幫手在日本現場推播，喊到就是你的")}
-    <div class="livehero">
-      <div class="row"><span class="ldot"></span><b style="font-size:15px">喊單進行中</b></div>
-      <h1 style="margin:8px 0 2px;font-size:19px;font-weight:900">${esc(LIVE.title)}</h1>
-      <div class="tiny" style="opacity:.82">${esc(LIVE.host)}　日本現場推播</div>
-      <div class="row" style="margin-top:12px">
-        <div class="cbox" style="flex:1"><b>${openN}</b><span>可喊商品</span></div>
-        <div class="cbox" style="flex:1"><b>${mine.reduce((a,l)=>a+l.q,0)}</b><span>我喊到</span></div>
-        <div class="cbox" style="flex:1.5"><b style="font-size:14px">${DB.broadcast[0]?esc(DB.broadcast[0].deadline):"—"}</b><span>收單截止</span></div></div>
-    </div>
-    <div class="alert pine" style="margin-top:12px"><b>也可以直接在群組喊</b><br>${esc(LIVE.hint)}　系統會自動放進你的購物車。</div>
-    <div class="h2">現場推播 <span class="dim tiny" style="font-weight:400">由新到舊</span></div>
-    <div class="lcgrid">${DB.broadcast.map(bcCard).join("")}</div>
-    <div class="sumbox" style="margin-top:14px;background:var(--gold-soft);border-color:var(--gold-soft)">
-      <div class="row" style="align-items:flex-start"><span style="font-size:19px">📷</span>
-        <div style="flex:1"><b style="font-size:14px">推播裡沒有、但你想要？</b>
-          <div class="tiny" style="color:#7A4F08;margin-top:2px">直接拍照下單，或到許願區請小幫手找</div></div>
-        <button class="btn ghost sm" onclick="orderPhoto()">拍照</button></div></div>
+    <header class="phead livehead">
+      <div class="row" style="gap:8px">${mascot("bear","🧸",46)}<h1 style="margin:0;flex:1">每日連線＋1</h1>
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 29c-6 0-10-6-10-11 0-4 3-7 6-7 2 0 3 1 4 1s2-1 4-1c3 0 6 3 6 7 0 5-4 11-10 11z" fill="#E86A5B"/><path d="M16 11c-1-3-4-4-6-4 1 2 3 4 6 4zm0 0c1-3 4-4 6-4-1 2-3 4-6 4z" fill="#7FA35B"/><g fill="#F6DB96"><circle cx="12" cy="17" r=".9"/><circle cx="17" cy="15" r=".9"/><circle cx="20" cy="20" r=".9"/><circle cx="14" cy="22" r=".9"/></g></svg></div>
+      <p>錯過連線也能加單。有尺寸的商品請先選尺寸，再按＋1 加入購物車。</p>
+    </header>
+    ${order.length?order.map(d=>`<div class="dayhead">${d}</div>
+      <div class="ltgrid">${days[d].map(liveTile).join("")}</div>`).join("")
+      :`<div class="empty" style="padding:30px 10px">${mascot("bear","🧸",64)}<h3>今天還沒有連線商品</h3>
+        <p>小幫手開播時會在 LINE 群組公告，也可以先上傳照片喊單。</p>
+        <button class="btn primary" onclick="orderPhoto()">＋ 上傳照片喊單</button></div>`}
+    <div class="alert pine" style="margin-top:14px"><b>也可以直接在群組喊</b><br>${esc(LIVE.hint)}　系統會自動放進你的購物車。</div>
     ${mine.length?`<button class="btn primary block" style="margin-top:14px" onclick="go('cart')">
       去購物車・${mine.reduce((a,l)=>a+l.q,0)} 件喊單商品</button>`:""}
     <p class="tiny dim" style="text-align:center;margin:16px 0 8px;line-height:1.7">
@@ -2349,7 +2471,7 @@ function vWall(){
     ${S.boardBusy&&!rows.length?`<div class="empty" style="padding:30px 10px"><span class="spin"></span><p>載入中…</p></div>`
     :S.boardErr&&!rows.length?`<div class="empty" style="padding:30px 10px"><h3>許願牆暫時打不開</h3>
         <button class="btn quiet" onclick="loadBoard(true)">再試一次</button></div>`
-    :rows.length?`<div class="tree"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
+    :rows.length?`<div class="tree"><img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
       <div class="row" style="align-items:flex-start">
         ${b.img?`<img class="pv zoomable" src="${b.img}" alt="" onerror="imgExpired()" onclick="lightbox('img','${jsq(b.img)}','${jsq(b.title)}')">`:`<div class="ph">⭐</div>`}
         <div style="flex:1;min-width:0">
@@ -2852,7 +2974,7 @@ if(DESKTOP.addEventListener) DESKTOP.addEventListener("change",placeNav); else i
 function render(){
   $("#view").dataset.tab=S.tab; placeNav();
   $("#view").innerHTML={home:vHome,live:vLive,wish:vWish,cart:vCart,orders:vOrders,me:vMe}[S.tab]();
-  $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.t===S.tab));
+  $$(".tab,.cartbtn").forEach(t=>t.classList.toggle("on",!!t.dataset.t&&t.dataset.t===S.tab));
   syncBadge();
 }
 setInterval(()=>{
