@@ -538,6 +538,25 @@ box-shadow:0 4px 0 #D9A93F,0 8px 16px rgba(86,80,66,.14)}
 .inrow b{font-size:14px;color:var(--title)}
 .inrow.read b{font-weight:500;color:var(--ink-2)}
 @media(min-width:860px){.topbar .iconbtn.bellbtn{display:grid;order:8;margin-left:auto}.topbar .iconbtn.bellbtn+.cartbtn{margin-left:6px}}
+/* 許願尋找進度、通知圖示、小幫手代登（2026-11-25） */
+.prog{margin-top:6px;padding:5px 9px;border-radius:9px;background:var(--pine-soft);color:var(--soft-ink);line-height:1.6;font-weight:600}
+.leafcard .prog{margin-top:2px;padding:3px 6px;font-size:10.5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.inrow .nico{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-size:17px;flex:none;position:relative}
+.inrow .nico .dot{position:absolute;top:-1px;right:-1px;margin:0;border:2px solid #fff;width:10px;height:10px}
+/* 周小姐的插畫（2026-11-25）：tree.png 載得到時，插畫放上面、卡片排下面；載不到時沿用 CSS 畫的樹 */
+.tree.hasimg{background:linear-gradient(180deg,#FBF7EA 0,var(--treebg) 46%);padding-top:10px}
+.tree.hasimg .treeimg{position:relative;inset:auto;display:block;width:min(64%,250px);height:auto;aspect-ratio:852/859;
+object-fit:contain;opacity:1;margin:0 auto -6px;filter:drop-shadow(0 6px 10px rgba(86,80,66,.12))}
+.tree.mini.hasimg .treeimg{width:min(46%,170px);margin-bottom:-4px}
+.tree.hasimg .canopy{background:none;box-shadow:none;border-radius:18px;padding:10px 4px 6px}
+.tree.mini.hasimg .canopy{padding:10px 2px 4px}
+.tree.hasimg .canopy::before,.tree.hasimg .canopy::after{display:none}
+.tree.hasimg .trunk{display:none}
+.tree.hasimg .woodsign{margin-top:8px}
+.shiphead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.shiphead h3{margin:0}
+.stmthead{display:flex;align-items:center;gap:10px;margin:2px 0 10px}
+.stmthead b{font-size:15px;color:var(--title)}
 </style>
 </head>
 <body>
@@ -850,10 +869,11 @@ var M={
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
     quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null,
+    prog:w.progress_note||null,progAt:w.progress_at||null,
     wall:w.wall_status||"private",votes:w.votes||0,bcNo:w.broadcast_send_id||null}),
   /* 許願牆一則：只有商品和人數，沒有任何人的身分（合約 27） */
   board:(b)=>({id:b.wish_id,title:b.item_name,img:b.picture||null,votes:b.votes||0,wants:b.wants||((b.votes||0)+1),
-    voted:!!b.voted,mine:!!b.mine,quote:b.quote_twd,
+    voted:!!b.voted,mine:!!b.mine,quote:b.quote_twd,prog:b.progress_note||null,progAt:b.progress_at||null,
     bc:b.broadcast?{no:b.broadcast.send_id,p:b.broadcast.price_twd,left:b.broadcast.remaining,
       deadline:b.broadcast.deadline_at?fmtTs(b.broadcast.deadline_at):""}:null}),
   order:(o)=>{ const st=OS.indexOf(o.status); const log={};
@@ -1350,14 +1370,16 @@ DB={
   {no:"BC-0913-001",n:"麵包超人 造型圍兜 兩件",e:"🎽",jpy:1309,p:490,qty:6,left:2,closed:true,
    deadline:"已截止",note:"款式：藍／紅",at:"昨天",hot:false,day:MOCK_DAY(1),sizes:null,imgs:[mockImg("#F5D075","🎽")]}],
  wishes:[
-  {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null,wall:"public",votes:4,bcNo:null},
-  {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null,wall:"private",votes:0,bcNo:null}],
+  {id:"W-104",src:"照片",title:"日本限定 麵包超人 溫度感應湯匙",note:"藍色那款",qty:2,st:"quoted",quote:980,at:"09/05",img:null,wall:"public",votes:4,bcNo:null,
+   prog:"大阪阪急問過了，藍色那款還有貨",progAt:new Date(Date.now()-2*36e5).toISOString()},
+  {id:"W-098",src:"文字",title:"阪急百貨限定的嬰兒襪禮盒",note:"新生兒尺寸",qty:3,st:"nostock",at:"08/31",img:null,wall:"private",votes:0,bcNo:null,prog:null,progAt:null}],
  board:[],
  boardSeed:[
   {wish_id:"W-104",item_name:"日本限定 麵包超人 溫度感應湯匙",picture:null,votes:4,wants:5,voted:false,mine:true,quote_twd:980,broadcast:null},
   {wish_id:"W-091",item_name:"阿卡將 限定口水巾 三入",picture:null,votes:11,wants:12,voted:true,mine:false,quote_twd:null,
    broadcast:{send_id:"BC-0913-003",price_twd:350,remaining:14,deadline_at:null}},
-  {wish_id:"W-087",item_name:"Combi 吸管水壺 替換吸管組",picture:null,votes:6,wants:7,voted:false,mine:false,quote_twd:null,broadcast:null},
+  {wish_id:"W-087",item_name:"Combi 吸管水壺 替換吸管組",picture:null,votes:6,wants:7,voted:false,mine:false,quote_twd:null,broadcast:null,
+   progress_note:"心齋橋店缺貨，下週補貨再幫大家看",progress_at:new Date(Date.now()-5*36e5).toISOString()},
   {wish_id:"W-080",item_name:"西松屋 有機棉 短袖包屁衣 80cm",picture:null,votes:2,wants:3,voted:false,mine:false,quote_twd:null,broadcast:null}],
  orders:[
   {id:"ORD-20260901-014",trip:"0913 大阪團",date:"09/01",st:1,pay:"待付款",split_shipped:false,stmt:null,shipGroup:null,parent:null,
@@ -1385,7 +1407,8 @@ DB={
    ship_group:{ship_group_id:"SG-0012",status:"已出貨",order_ids:["ORD-20260828-007","ORD-20260826-003"],pickup:"宅配到府",pickup_addr:"新北市板橋區文化路一段188號 5樓",
      created_at:"2026-08-29T05:30:00.000Z",orders:[{order_id:"ORD-20260828-007",status:"已送達",total_twd:960,ship_fee_twd:70},{order_id:"ORD-20260826-003",status:"已送達",total_twd:540,ship_fee_twd:0}]}}],
  inbox:[
-  {notif_id:"N-5",kind:"quote_ready",title:"報價好了",body:"你許願的「日本限定 麵包超人 溫度感應湯匙」報價 NT$980，可以加入購物車。",path:"wish",order_id:null,statement_id:null,created_at:new Date(Date.now()-18*6e4).toISOString(),read:false,read_at:null},
+  {notif_id:"N-6",kind:"bought",title:"小幫手幫你買到了",body:"🛍️ 小幫手幫你買到了「六重紗布浴巾 90×90 兩入」，已加進訂單 ORD-20260901-014。",path:"orders",order_id:"ORD-20260901-014",statement_id:null,created_at:new Date(Date.now()-6*6e4).toISOString(),read:false,read_at:null},
+  {notif_id:"N-5",kind:"quoted",title:"報價好了",body:"你許願的「日本限定 麵包超人 溫度感應湯匙」報價 NT$980，可以加入購物車。",path:"wish",order_id:null,statement_id:null,created_at:new Date(Date.now()-18*6e4).toISOString(),read:false,read_at:null},
   {notif_id:"N-4",kind:"out_of_stock",title:"缺貨通知",body:"訂單 ORD-20260901-014 的「米菓仙貝」現場缺貨，這項不會收費。",path:"orders",order_id:"ORD-20260901-014",statement_id:null,created_at:new Date(Date.now()-3*36e5).toISOString(),read:false,read_at:null},
   {notif_id:"N-3",kind:"ship_request",title:"出貨申請",body:"你的併單申請已核准：2 張訂單併成一包寄出，運費 NT$70。",path:"orders",order_id:"ORD-20260828-007",statement_id:null,created_at:"2026-08-29T05:30:00.000Z",read:true,read_at:"2026-08-29T06:00:00.000Z"},
   {notif_id:"N-2",kind:"payment_received",title:"收到款項",body:"對帳單 STMT-20260901-0031 已收到 NT$960，謝謝！",path:"stmt",order_id:null,statement_id:"STMT-20260901-0031",created_at:"2026-09-01T13:14:00.000Z",read:true,read_at:"2026-09-01T13:20:00.000Z"},
@@ -1950,6 +1973,8 @@ function wishShare(id){
     .catch(e=>{ w.wall=e.code==="HIDDEN_BY_SHOP"?"hidden":prev; render(); });
 }
 /* 牆上看得懂的卡片：沒照片又只叫「照片許願」的，別人看不出是什麼，不顯示（自己的照樣顯示） */
+/* 店家寫給客人看的尋找進度（後端 018）：沒寫就不顯示 */
+function progLine(x){ return x&&x.prog?`<div class="prog tiny">🔎 店家：${esc(x.prog)}${x.progAt?`・${fmtDate(x.progAt)}`:""}</div>`:""; }
 function wallRows(){ return DB.board.filter(b=>b.mine||b.img||b.title!=="照片許願"); }
 function openWall(){ S.wishView="wall"; go("wish"); loadBoard(); }
 function homeWallCard(){
@@ -2456,7 +2481,8 @@ function cartLine(l){
     <div class="info">
       <div class="row" style="gap:6px;margin-bottom:3px">
         <span class="pill ${c.c}" style="padding:1px 7px;font-size:10.5px">${c.e} ${c.t}</span>
-        ${l.st==="pending"&&cf&&l.conf!=="high"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}</div>
+        ${l.st==="pending"&&cf&&l.conf!=="high"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}
+        ${/^小幫手現場幫你買到了/.test(l.note||"")?`<span class="pill pine" style="padding:1px 7px;font-size:10.5px" data-helper="1">🛍️ 小幫手代登</span>`:""}</div>
       <b>${esc(l.n)}</b>
       ${l.size?`<div class="tiny" style="font-weight:700;color:var(--soft-ink)">尺寸 ${esc(l.size)}</div>`:""}
       ${l.nja?`<div class="tiny dim">${esc(l.nja)}</div>`:""}
@@ -2501,10 +2527,10 @@ function homeTree(){
   return `<div class="sechead">${mascot("bunny","🐰",34)}<h2>大家的許願樹</h2>
       <button class="btn soft sm" onclick="wishQuick()">＋許個願</button></div>
     <div class="tree mini" onclick="openWall()" style="cursor:pointer">
-      <img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()">
+      <img class="treeimg" src="assets/tree.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()">
       <div class="canopy">${rows.length?rows.map(b=>`<div class="leafcard">
           ${b.img?`<img src="${b.img}" alt="" onerror="imgExpired()">`:`<div class="ph">⭐</div>`}
-          <span class="lname">${esc(b.title)}</span><span class="lwant">🙋 ${b.wants}</span></div>`).join("")
+          <span class="lname">${esc(b.title)}</span><span class="lwant">🙋 ${b.wants}</span>${progLine(b)}</div>`).join("")
         :`<p class="tiny" style="grid-column:1/-1;text-align:center;margin:8px 0">還沒有人把願望掛上來，第一個許願吧 🌱</p>`}</div>
       <div class="trunk" aria-hidden="true"></div>
       <div class="woodsign">HEEEHABABY ♡ 我幫你保管每一個小心願 ♡</div></div>`;
@@ -2603,7 +2629,7 @@ function vWall(){
     ${S.boardBusy&&!rows.length?`<div class="empty" style="padding:30px 10px"><span class="spin"></span><p>載入中…</p></div>`
     :S.boardErr&&!rows.length?`<div class="empty" style="padding:30px 10px"><h3>許願牆暫時打不開</h3>
         <button class="btn quiet" onclick="loadBoard(true)">再試一次</button></div>`
-    :rows.length?`<div class="tree"><img class="treeimg" src="assets/tree.png" alt="" onerror="this.remove()"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
+    :rows.length?`<div class="tree"><img class="treeimg" src="assets/tree.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"><div class="canopy">`+rows.map(b=>`<div class="wish wall" data-wall="${esc(b.id)}">
       <div class="row" style="align-items:flex-start">
         ${b.img?`<img class="pv zoomable" src="${b.img}" alt="" onerror="imgExpired()" onclick="lightbox('img','${jsq(b.img)}','${jsq(b.title)}')">`:`<div class="ph">⭐</div>`}
         <div style="flex:1;min-width:0">
@@ -2611,6 +2637,7 @@ function vWall(){
           <div class="wants" style="margin-top:4px">🙋 ${b.wants} 人想要</div>
           ${b.bc?`<div class="tiny dim" style="margin-top:2px">已開喊單・剩 ${b.bc.left} 份${b.bc.deadline?"・"+esc(b.bc.deadline)+" 截止":""}</div>`
             :b.mine&&b.quote?`<div class="tiny dim" style="margin-top:2px">店家報價 NT$${nf(b.quote)} / 件</div>`:""}
+          ${progLine(b)}
         </div></div>
       <div style="margin-top:10px">
         ${b.bc?`<button class="btn primary sm block" onclick="wallShout('${jsq(b.id)}')">NT$${nf(b.bc.p)} 去搶</button>`
@@ -2651,6 +2678,7 @@ function vWishMine(){
             <div class="tiny dim">數量 ${w.qty}</div></div>
           <span class="pill ${s.c}" style="flex:none">${s.t}</span></div>
         <div class="tiny dim" style="margin-top:7px">${s.d}${w.orderId?`（${w.orderId}）`:""}</div>
+        ${progLine(w)}
         ${w.st==="quoted"?`<div class="between" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
           <div><span class="tiny dim">報價</span>
             <span style="font-weight:900;font-size:16px;color:var(--pine-deep);margin-left:6px">NT$${nf(w.quote)} / 件</span>
@@ -2771,7 +2799,7 @@ function shipPanel(){
   const sel=[...(S.shipSel||new Set())].filter(id=>el.some(o=>o.id===id));
   const one=sel.length===1&&canSplit(DB.orders.find(o=>o.id===sel[0]));
   return `<section class="shippanel" id="shippanel">
-    <h3>我想怎麼寄？</h3>
+    <div class="shiphead">${mascot("goose","🪿",46)}<h3>我想怎麼寄？</h3></div>
     <p class="tiny dim" style="margin:0 0 6px;line-height:1.7">勾選訂單 → 選「併單」或「到貨先拆單寄」→ 店家確認運費後通知你。</p>
     ${el.length?el.map(o=>{ const arr=o.items.filter(i=>i.ist==="已到貨").length;
       return `<label class="shipsel"><input type="checkbox" ${sel.indexOf(o.id)>=0?"checked":""} onchange="shipToggle('${o.id}',this.checked)">
@@ -2885,6 +2913,8 @@ async function shipCancel(id){
 }
 
 /* ---------- 站內通知中心（合約 34～36） ---------- */
+var NOTIF_ICON={bought:"🛍️",quoted:"💬",out_of_stock:"😢",transfer_verified:"💰",payment_received:"💰",statement:"🧾",
+  payment_reminder:"⏰",ship_request:"📦",shipped:"🚚",arrived:"📬",wish_broadcast:"📣"};
 async function openInbox(){
   openSheet("通知",`<div id="inboxBody"><div class="sm dim" style="padding:20px 0;text-align:center">載入中…</div></div>`,
     `<button class="btn quiet block" onclick="inboxReadAll()">全部標為已讀</button>`);
@@ -2900,11 +2930,11 @@ async function inboxMore(){
 }
 function paintInbox(){
   const el=$("#inboxBody"); if(!el) return;
-  if(INBOX.err){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>通知暫時載不到</h3><p>請稍後再試；重要通知也會用 LINE 傳給你。</p></div>`; return; }
-  if(!INBOX.items.length){ el.innerHTML=`<div class="empty" style="padding:26px 6px"><div style="font-size:30px">🔔</div><h3>還沒有通知</h3><p>報價、收款、缺貨、出貨申請和對帳單的消息都會放在這裡。</p></div>`; return; }
+  if(INBOX.err){ el.innerHTML=`<div class="empty" style="padding:26px 6px">${mascot("cat","🐱",84)}<h3>通知暫時載不到</h3><p>請稍後再試；重要通知也會用 LINE 傳給你。</p></div>`; return; }
+  if(!INBOX.items.length){ el.innerHTML=`<div class="empty" style="padding:26px 6px">${mascot("cat","🐱",84)}<h3>還沒有通知</h3><p>報價、收款、缺貨、出貨申請和對帳單的消息都會放在這裡。</p></div>`; return; }
   el.innerHTML=`<p class="tiny dim" style="margin:0 0 4px">${INBOX.unread?`${INBOX.unread} 則未讀`:"都看過了"}</p>`+INBOX.items.map(x=>`
     <button class="inrow ${x.read?"read":""}" data-nid="${esc(x.notif_id)}" onclick="inboxGo('${jsq(x.notif_id)}')">
-      <span class="dot ${x.read?"read":""}"></span>
+      <span class="nico" aria-hidden="true">${NOTIF_ICON[x.kind]||"🔔"}${x.read?"":`<span class="dot"></span>`}</span>
       <span style="flex:1;min-width:0"><b>${esc(x.title||"通知")}</b>
         <span class="sm" style="display:block;color:var(--ink-2);line-height:1.6;margin-top:2px;white-space:pre-line">${esc(x.body||x.text||"")}</span>
         <span class="tiny dim">${fmtTs(x.created_at)}${x.path?"・點一下查看":""}</span></span></button>`).join("")
@@ -2922,6 +2952,7 @@ function inboxGo(id){
   else if(x.path==="stmt"){ S.oFilter="stmt"; S.oStage=null; go("orders"); }
   else if(x.path==="wish"){ S.wishView="mine"; go("wish"); }
   else if(x.path==="live"){ go("live"); }
+  else if(x.path==="cart"){ go("cart"); }
   else go("home");
 }
 async function inboxReadAll(){
@@ -2955,6 +2986,8 @@ function vStmt(){
   const unbilled=DB.orders.filter(o=>!o.stmt&&o.st>=1);
   const sum=unbilled.reduce((a,o)=>a+o.total,0);
   return `
+    <div class="stmthead">${mascot("squirrel","🐿️",48)}<div><b>對帳單</b>
+      <div class="tiny dim">每一次結算、付款和發票紀錄都在這裡</div></div></div>
     ${unbilled.length?`<div class="alert gold">
       <b>尚未結算 ${unbilled.length} 筆・NT$${nf(sum)}</b><br>
       ${SHOP.nextStmt?`下次結算日 <b>${esc(SHOP.nextStmt)}</b>，`:"每月 15 日、月底結算，"}結算後會推播對帳單給你。</div>`:""}
