@@ -882,7 +882,8 @@ var M={
   cart:(c)=>{ const src=c.source==="reorder"?"text":c.source;
     return {k:"S"+c.cart_id,cid:c.cart_id,src,ref:src==="broadcast"?c.ref:(c.ref||c.cart_id),n:c.name,nja:c.name_ja||"",
       e:ICON[c.source]||"🛍️",p:c.price_twd,jpy:c.jpy_taxed,q:c.qty,max:99,conf:c.ai_confidence||"high",size:c.size||null,
-      st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done}; },
+      st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done,
+      at:c.created_at?new Date(c.created_at).getTime():null}; },
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
     quote:w.quote_twd,at:fmtDate(w.wished_at),img:w.picture||null,file:w.file_name||null,
@@ -1872,7 +1873,7 @@ function reviewOrder(){
   openSheet("確認訂單",`
     <div class="list">${C.map(l=>
       `<div class="item"><div class="ph">${l.e}</div><div class="info">
-        <b>${esc(l.n)}</b><div class="tiny dim">× ${l.q}　<span class="pill ${SRC[l.src].c}" style="padding:1px 7px;font-size:10.5px">${SRC[l.src].e} ${SRC[l.src].t}</span></div></div>
+        <b>${esc(lineTitle(l))}</b><div class="tiny dim">× ${l.q}　<span class="pill ${SRC[l.src].c}" style="padding:1px 7px;font-size:10.5px">${SRC[l.src].e} ${SRC[l.src].t}</span></div></div>
         <div class="sm" style="font-weight:700;align-self:center">${l.p?`NT$${nf(l.p*l.q)}`:"待報價"}</div></div>`).join("")}</div>
     <div class="sumbox" style="margin-top:12px">
       <div class="sumrow"><span>商品小計</span><span>NT$${nf(sub)}</span></div>
@@ -2579,7 +2580,7 @@ function confirmAll(){
 function editLine(k){
   const l=S.cart.find(x=>x.k===k); if(!l)return;
   openSheet("修改內容",`
-    <div class="field"><label>商品名稱</label><input id="en" value="${esc(l.n)}"></div>
+    <div class="field"><label>商品名稱</label><input id="en" value="${esc(lineTitle(l)==="拍照下單"?"":l.n)}" placeholder="例：恐龍變色 T 恤 100cm"></div>
     <div class="field"><label>日幣税込價格</label>
       <input id="ej" type="number" inputmode="numeric" value="${l.jpy||""}" placeholder="不確定可留空，由小幫手報價"></div>
     <div class="field"><label>數量</label><input id="eq" type="number" value="${l.q}" min="1" inputmode="numeric"></div>
@@ -2662,21 +2663,34 @@ function vCart(){
     <button class="btn primary block" style="margin-top:12px" onclick="reviewOrder()">下一步・確認訂單</button>
     <button class="btn quiet block" style="margin-top:9px" onclick="go('home')">繼續下單</button></div></div></div>`}`;
 }
+/* 拍照下單：辨識還沒結束時，後端的 name 是客人手機的原始檔名（IMG_6740.jpeg），
+   file_name 是系統暫存檔名（ocr_temp_…）。這兩個都不給客人看。 */
+const OCR_WAIT_NOTE="AI 辨識中，完成後自動更新";
+const looksFile=n=>/\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(String(n||"").trim())||/^ocr_temp_/i.test(String(n||""));
+function lineTitle(l){
+  if(l.src==="image"&&(l.ocrDone===false||looksFile(l.n)||!String(l.n||"").trim())) return "拍照下單";
+  return l.n;
+}
+function lineNote(l){
+  if(l.src!=="image"||l.note!==OCR_WAIT_NOTE) return l.note;
+  /* 上傳超過 30 分鐘還在等：後端多半已經判定要現場報價，不要再說「AI 辨識中」 */
+  if(l.at&&Date.now()-l.at>30*6e4) return "等小幫手現場確認商品與報價";
+  return l.note;
+}
 function cartLine(l){
   const c=SRC[l.src], cf=l.conf?CONF[l.conf]:null;
   return `<div class="item" style="background:var(--surface);border:1px solid var(--line-soft);border-radius:13px;margin-bottom:9px">
-    <div class="ph ${l.img?"zoomable":""}" ${l.img?`onclick="lightbox('img','${jsq(l.img)}','${jsq(l.n)}')"`:""}>
+    <div class="ph ${l.img?"zoomable":""}" ${l.img?`onclick="lightbox('img','${jsq(l.img)}','${jsq(lineTitle(l))}')"`:""}>
       ${l.img?`<img src="${l.img}" onerror="imgExpired()">`:l.e}</div>
     <div class="info">
       <div class="row" style="gap:6px;margin-bottom:3px">
         <span class="pill ${c.c}" style="padding:1px 7px;font-size:10.5px">${c.e} ${c.t}</span>
         ${l.st==="pending"&&cf&&l.conf!=="high"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}
         ${/^小幫手現場幫你買到了/.test(l.note||"")?`<span class="pill pine" style="padding:1px 7px;font-size:10.5px" data-helper="1">🛍️ 小幫手代登</span>`:""}</div>
-      <b>${esc(l.n)}</b>
+      <b data-title>${esc(lineTitle(l))}</b>
       ${l.size?`<div class="tiny" style="font-weight:700;color:var(--soft-ink)">尺寸 ${esc(l.size)}</div>`:""}
       ${l.nja?`<div class="tiny dim">${esc(l.nja)}</div>`:""}
-      ${l.file?`<div class="tiny dim code" style="opacity:.75">${esc(l.file)}</div>`:""}
-      ${l.note?`<div class="tiny dim">${esc(l.note)}</div>`:""}
+      ${lineNote(l)?`<div class="tiny dim" data-note>${esc(lineNote(l))}</div>`:""}
       <div class="between" style="margin-top:7px">
         ${l.p?`<span style="font-weight:900;color:var(--pine-deep)">NT$${nf(l.p*l.q)}
             ${l.jpy?`<span class="tiny dim" style="font-weight:400">税込 ¥${nf(l.jpy)}</span>`:""}</span>`
