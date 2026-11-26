@@ -2366,6 +2366,12 @@ function tripLeftTxt(){
   if(d<=0) return "已截止";
   return `${Math.floor(d/864e5)} 天 ${pad(Math.floor(d/36e5)%24)}:${pad(Math.floor(d/6e4)%60)}`;
 }
+/* 首頁團卡：後台「一律顯示」就顯示；「自動」只在這團還沒截止時顯示；「一律隱藏」不顯示。 */
+function tripVisible(){
+  if(!TRIP||!TRIP.code||SHOP.showTrip===false) return false;
+  if(SHOP.showTrip===true) return true;
+  return TRIP.closeAt instanceof Date && TRIP.closeAt.getTime()>Date.now();
+}
 function tripCount(){
   const d=TRIP.closeAt-new Date();
   const dd=Math.max(0,Math.floor(d/864e5)),hh=Math.max(0,Math.floor(d/36e5)%24),
@@ -2396,11 +2402,7 @@ function vHome(){
       <span><b>有包裹可以取貨了</b><br><span class="tiny" style="opacity:.85">請於到店後 7 日內取件</span></span>
       <span class="ar">›</span></button>`:""}
 
-    ${SHOP.showTrip===false?"":!TRIP.code?`<section class="trip" data-trip="none" style="padding:16px 18px">
-      <div class="code">本次採買行程</div>
-      <div style="font-weight:700;font-size:15px;margin-top:4px">目前沒有開放中的團</div>
-      <div class="sub" style="margin-top:2px">下一團開放時會在聊天室通知；沒有團的時候也可以許願，或直接拍照下單</div>
-    </section>`:`<section class="trip" data-trip="open">
+    ${!tripVisible()?"":`<section class="trip" data-trip="open">
       <div class="code">本次採買行程　${TRIP.code}</div>
       <h1>${TRIP.name}</h1>
       <div class="sub">${TRIP.region}・實體店面現場採買</div>
@@ -2420,7 +2422,7 @@ function vHome(){
     </section>`}
 
     ${openBC.length?`
-    <div class="h2">📣 現場連線喊單 <span class="pill beni" style="margin-left:4px">進行中</span></div>
+    <div class="h2">📣 今日連線行程 <span class="pill beni" style="margin-left:4px">進行中</span></div>
     <div class="livebar" onclick="go('live')" style="cursor:pointer">
       <span class="ldot"></span>
       <span style="flex:1;text-align:left"><b>${esc(LIVE.title)}</b>
@@ -2429,44 +2431,12 @@ function vHome(){
     <div style="height:11px"></div>
     <div class="ltgrid">${openBC.slice(0,2).map(liveTile).join("")}</div>
     ${openBC.length>2?`<button class="btn quiet block" onclick="go('live')">看全部 ${openBC.length} 項喊單 ›</button>`:""}
-    `:`
-    <div class="h2">📣 現場連線喊單</div>
-    <div class="sumbox" style="text-align:center;padding:20px">
-      <div class="sm dim">目前沒有進行中的連線</div>
-      <div class="tiny dim" style="margin-top:4px">小幫手開播時會在 LINE 群組公告</div></div>`}
+    `:""}
 
     ${photoShoutCard()}
-    ${homeTree()}
 
     </div><div class="hg-side">
-    <div class="h2">也可以這樣下單</div>
-    <div class="entry">
-      <button class="ecard" onclick="orderText()">
-        <em>✏️</em><b>文字下單</b><span>知道商品名稱，直接打字最快</span></button>
-      <button class="ecard" onclick="orderPhoto()">
-        <em>📷</em><b>拍照下單</b><span>看到商品就拍，自動辨識品名與税込価格</span></button>
-    </div>
-    <button class="ecard" style="width:100%;margin-top:11px;flex-direction:row;align-items:center;gap:12px" onclick="go('wish')">
-      <em style="margin:0">⭐</em>
-      <span style="flex:1"><b style="display:block">許願代找</b>
-        <span>不確定日本有沒有貨？寫下來，小幫手到現場幫你找</span></span>
-      <span class="ar dim" style="font-size:17px">›</span></button>
-
-    <div class="h2">價目表</div>
-    <details class="fold" ${S.open.has("pt")?"open":""} ontoggle="fold('pt',this.open)">
-      <summary>日幣税込 → 台幣售價<span class="sumnote">${PRICE_TABLE.length} 個級距</span></summary>
-      <div class="foldbody">
-        ${PRICE_TABLE.map((r,i)=>`<div class="sumrow" style="padding:3px 0">
-          <span>¥${nf(i?PRICE_TABLE[i-1][0]+1:0)} – ¥${nf(r[0])}</span>
-          <span style="font-weight:700;color:var(--pine-deep)">NT$${nf(r[1])}</span></div>`).join("")}
-        <p class="tiny dim" style="margin:9px 0 0;line-height:1.8">
-          一律以商品標籤上的「税込価格」對照，不以本体価格計算。<br>
-          超過 ¥${nf(PRICE_TABLE[PRICE_TABLE.length-1][0])} 需個別報價。<br>
-          盒裝或大型物品另加 NT$${BULKY_ADD[0]}~${BULKY_ADD[1]}。</p></div></details>
-
-    <p class="tiny dim" style="text-align:center;margin:20px 0 8px;line-height:1.75">
-      所有商品由小幫手在日本當地實體店面現場採買<br>
-      現場缺貨會即時通知，該品項不列入對帳單</p>
+    ${homeTree()}
   </div></div></div>`;
 }
 
