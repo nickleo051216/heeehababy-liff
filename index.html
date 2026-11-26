@@ -883,6 +883,7 @@ var M={
     return {k:"S"+c.cart_id,cid:c.cart_id,src,ref:src==="broadcast"?c.ref:(c.ref||c.cart_id),n:c.name,nja:c.name_ja||"",
       e:ICON[c.source]||"🛍️",p:c.price_twd,jpy:c.jpy_taxed,q:c.qty,max:99,conf:c.ai_confidence||"high",size:c.size||null,
       st:c.status,note:c.note||"",img:c.image_url||null,file:c.file_name||null,ocrDone:c.ocr_done,
+      ocrStatus:c.ocr_status||null,ocrMsg:c.ocr_message||null,
       at:c.created_at?new Date(c.created_at).getTime():null}; },
   wish:(w)=>({id:w.wish_id,src:w.ref_url?"連結":w.file_name?"照片":"文字",title:w.item_name,note:w.note||"",
     qty:w.quantity,st:({"待處理":"parsing","已報價":"quoted","現場缺貨":"nostock","保留下團":"kept","已下單":"converted"})[w.wish_status]||"parsing",
@@ -2671,11 +2672,27 @@ function lineTitle(l){
   if(l.src==="image"&&(l.ocrDone===false||looksFile(l.n)||!String(l.n||"").trim())) return "拍照下單";
   return l.n;
 }
+/* v1.8.1（後端 #52）：拍照下單照 ocr_status／ocr_message 顯示，不自己寫死「辨識中」 */
+const SHOP_QUOTED_NOTE="店家報價：請確認後結帳";
 function lineNote(l){
-  if(l.src!=="image"||l.note!==OCR_WAIT_NOTE) return l.note;
-  /* 上傳超過 30 分鐘還在等：後端多半已經判定要現場報價，不要再說「AI 辨識中」 */
+  if(l.src!=="image") return l.note;
+  if(l.ocrStatus){
+    /* 狀態那句另外顯示（ocrLine），備註跟它一樣、或是上傳時的那句，就不重複 */
+    if(l.note===l.ocrMsg||l.note===OCR_WAIT_NOTE||l.note===SHOP_QUOTED_NOTE) return "";
+    return l.note;
+  }
+  /* 舊後端沒有 ocr_status：上傳超過 30 分鐘還在等，改說法 */
+  if(l.note!==OCR_WAIT_NOTE) return l.note===SHOP_QUOTED_NOTE?"":l.note;
   if(l.at&&Date.now()-l.at>30*6e4) return "等小幫手現場確認商品與報價";
   return l.note;
+}
+function ocrLine(l){
+  if(l.src!=="image"||!l.ocrStatus||l.ocrStatus==="none") return "";
+  if(l.note===SHOP_QUOTED_NOTE) return "";
+  if(l.ocrStatus==="pending") return `<div class="tiny" data-ocr="pending" style="color:var(--soft-ink)"><span class="spin" style="width:10px;height:10px"></span> ${esc(l.ocrMsg||"AI 辨識中，通常 1～2 分鐘")}</div>`;
+  if(l.ocrStatus==="failed") return `<div class="tiny" data-ocr="failed" style="color:var(--beni);line-height:1.6">${esc(l.ocrMsg||"照片沒辨識出來，請自己填品名和價格，或等店家報價")}
+      <button class="link" style="display:block;margin-top:2px" onclick="editLine('${l.k}')">自己填品名和價格 ›</button></div>`;
+  return l.ocrMsg?`<div class="tiny" data-ocr="done" style="color:var(--gold)">${esc(l.ocrMsg)}</div>`:"";
 }
 function cartLine(l){
   const c=SRC[l.src], cf=l.conf?CONF[l.conf]:null;
@@ -2685,11 +2702,13 @@ function cartLine(l){
     <div class="info">
       <div class="row" style="gap:6px;margin-bottom:3px">
         <span class="pill ${c.c}" style="padding:1px 7px;font-size:10.5px">${c.e} ${c.t}</span>
-        ${l.st==="pending"&&cf&&l.conf!=="high"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}
-        ${/^小幫手現場幫你買到了/.test(l.note||"")?`<span class="pill pine" style="padding:1px 7px;font-size:10.5px" data-helper="1">🛍️ 小幫手代登</span>`:""}</div>
+        ${l.st==="pending"&&cf&&l.conf!=="high"&&l.note!==SHOP_QUOTED_NOTE&&l.ocrStatus!=="pending"?`<span class="pill ${cf.c}" style="padding:1px 7px;font-size:10.5px">${cf.t}</span>`:""}
+        ${/^小幫手現場幫你買到了/.test(l.note||"")?`<span class="pill pine" style="padding:1px 7px;font-size:10.5px" data-helper="1">🛍️ 小幫手代登</span>`:""}
+        ${l.note===SHOP_QUOTED_NOTE?`<span class="pill pine" style="padding:1px 7px;font-size:10.5px" data-shopq="1">🏷️ 店家已報價・請確認</span>`:""}</div>
       <b data-title>${esc(lineTitle(l))}</b>
       ${l.size?`<div class="tiny" style="font-weight:700;color:var(--soft-ink)">尺寸 ${esc(l.size)}</div>`:""}
       ${l.nja?`<div class="tiny dim">${esc(l.nja)}</div>`:""}
+      ${ocrLine(l)}
       ${lineNote(l)?`<div class="tiny dim" data-note>${esc(lineNote(l))}</div>`:""}
       <div class="between" style="margin-top:7px">
         ${l.p?`<span style="font-weight:900;color:var(--pine-deep)">NT$${nf(l.p*l.q)}
